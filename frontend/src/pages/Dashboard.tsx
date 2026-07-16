@@ -44,6 +44,8 @@ export default function Dashboard() {
     if (!window.confirm(`Delete "${item.title}" and all its answers?`)) return;
     await deleteForm(item.id);
     setForms((all) => all.filter((f) => f.id !== item.id));
+    // Tell the header to refresh the "X/1 collections" usage count.
+    window.dispatchEvent(new Event("parlo:usage-changed"));
   }
 
   async function handleCopy(item: FormListItem) {

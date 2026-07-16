@@ -13,10 +13,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const token = getToken();
   const [me, setMe] = useState<Me | null>(null);
 
-  // Refresh the current guest + usage on every navigation, so the collection
-  // count in the header stays current after creating or deleting one.
+  // Refresh usage on navigation AND whenever a page signals it changed the count
+  // (e.g. deleting a collection stays on the dashboard, so there's no navigation).
   useEffect(() => {
-    if (token) getMe().then(setMe).catch(() => setMe(null));
+    if (!token) return;
+    const load = () => getMe().then(setMe).catch(() => setMe(null));
+    load();
+    window.addEventListener("parlo:usage-changed", load);
+    return () => window.removeEventListener("parlo:usage-changed", load);
   }, [token, location.pathname]);
 
   // No token → straight to the entry page. The API also 401s; this is the fast path.
