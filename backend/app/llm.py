@@ -145,7 +145,12 @@ def phrase_question(
     """
     fallback = str(question.text)
     if is_first:
-        guidance = "Ask this question directly, warmly, in one sentence."
+        guidance = (
+            "This is the FIRST question — the respondent has said nothing yet, so "
+            "there is NOTHING to react to. Do NOT add any acknowledgement, reaction, "
+            "or opener like 'Great!', 'That's great to hear!', 'Thanks!', or 'Sounds "
+            "good'. Just ask the question itself, warmly, in one short sentence."
+        )
     elif prev_answer:
         guidance = (
             "First, briefly and genuinely react to what they just said — vary it, "
@@ -173,14 +178,17 @@ def phrase_question(
                     "role": "system",
                     "content": (
                         "You are Parlo, a warm, genuinely conversational interviewer "
-                        f'collecting answers for "{title}". {guidance} The answer widget '
-                        "already shows any options/scale, so do not list them all. "
-                        "Plain text only, no quotes, no emoji spam."
+                        f'collecting answers for "{title}". {guidance} CRITICAL: you must '
+                        "ask the EXACT question you are given — keep its full meaning, "
+                        "never swap it for a different question, add new topics, or drift. "
+                        "You may only make it sound natural. The answer widget already "
+                        "shows any options/scale, so do not list them all. Plain text "
+                        "only, no quotes, no emoji spam."
                     ),
                 },
                 {"role": "user", "content": user_content},
             ],
-            temperature=0.7,
+            temperature=0.5,
         )
         text = (response.choices[0].message.content or "").strip()
         return text or fallback
