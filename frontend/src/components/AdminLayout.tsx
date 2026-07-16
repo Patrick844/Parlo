@@ -2,20 +2,22 @@
  *  an "Exit" button that switches email. Guarded by the presence of a token. */
 
 import { ReactNode, useEffect, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { clearToken, getMe, getToken, type Me } from "../lib/api";
 import Logo from "./Logo";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const token = getToken();
   const [me, setMe] = useState<Me | null>(null);
 
-  // Load the current guest + usage for the header (best-effort).
+  // Refresh the current guest + usage on every navigation, so the collection
+  // count in the header stays current after creating or deleting one.
   useEffect(() => {
     if (token) getMe().then(setMe).catch(() => setMe(null));
-  }, [token]);
+  }, [token, location.pathname]);
 
   // No token → straight to the entry page. The API also 401s; this is the fast path.
   if (!token) return <Navigate to="/login" replace />;

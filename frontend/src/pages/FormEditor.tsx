@@ -1,6 +1,6 @@
 /** Builder: edit a collection's title, description, and question list. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import {
@@ -52,6 +52,8 @@ export default function FormEditor() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [linkReady, setLinkReady] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getForm(id).then(setForm).catch(() => setError("Collection not found"));
@@ -66,11 +68,12 @@ export default function FormEditor() {
     setForm((f) => (f ? { ...f, ...updated, questions: f.questions } : f));
   }
 
-  /** New questions are inserted at the TOP by the backend, so re-fetch to get
-   *  the authoritative order rather than guessing where they landed. */
+  /** Re-fetch after adding (backend appends at the end), then scroll the newest
+   *  question into view so it's obvious it was added. */
   async function handleAdded() {
     const fresh = await getForm(id);
     setForm(fresh);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }
 
   async function handleMove(index: number, direction: -1 | 1) {
@@ -112,30 +115,13 @@ export default function FormEditor() {
           ← All collections
         </Link>
         <div className="flex items-center gap-2">
-          {/* Sharing unlocks only once every question slot is filled. */}
-          <button
-            className="btn-ghost text-xs"
-            onClick={handleCopy}
-            disabled={form.questions.length < form.size}
-            title={
-              form.questions.length < form.size
-                ? `Add all ${form.size} questions to share`
-                : ""
-            }
-          >
-            {copied
-              ? "Copied!"
-              : form.questions.length < form.size
-                ? `Locked · ${form.questions.length}/${form.size}`
-                : "Copy public link"}
-          </button>
           <button
             className="btn-ghost text-xs"
             onClick={() => saveMeta({ is_open: !form.is_open })}
           >
             {form.is_open ? "Close to answers" : "Reopen"}
           </button>
-          <Link className="btn-primary text-xs" to={`/forms/${id}/insights`}>
+          <Link className="btn-ghost text-xs" to={`/forms/${id}/insights`}>
             View insights
           </Link>
         </div>
@@ -201,6 +187,59 @@ export default function FormEditor() {
           ))}
         </div>
       )}
+
+      <div ref={bottomRef} />
+
+      {/* Share section — the chatbot link is generated once the collection is full. */}
+      <div className="mt-6">
+        {form.questions.length < form.size ? (
+          <div className="card p-6 text-center text-sm text-dim">
+            🔒 Add all {form.size} questions ({form.questions.length}/{form.size}) to
+            generate your shareable chatbot link.
+          </div>
+        ) : !linkReady ? (
+          <div className="card animate-pop-in p-8 text-center">
+            <div className="mb-2 text-4xl">🎉</div>
+            <p className="mb-1 text-lg font-semibold">Your collection is ready!</p>
+            <p className="mb-5 text-sm text-dim">
+              Generate the chatbot link and share it — people answer by chatting.
+            </p>
+            <button className="btn-primary px-8" onClick={() => setLinkReady(true)}>
+              ✨ Generate chatbot link
+            </button>
+          </div>
+        ) : (
+          <div className="card animate-pop-in p-6">
+            <p className="mb-3 text-sm font-medium">🔗 Your chatbot link</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                className="input flex-1 font-mono text-xs"
+                readOnly
+                value={publicLink(form.slug)}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <button className="btn-primary shrink-0" onClick={handleCopy}>
+                {copied ? "Copied! ✓" : "Copy link"}
+              </button>
+              <a
+                className="btn-ghost shrink-0"
+                href={publicLink(form.slug)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Preview ↗
+              </a>
+            </div>
+            <p className="mt-3 text-xs text-dim">
+              Anyone with this link can answer. Track responses on the{" "}
+              <Link to={`/forms/${id}/insights`} className="text-iris hover:underline">
+                insights page
+              </Link>
+              .
+            </p>
+          </div>
+        )}
+      </div>
 
       {adding && (
         <AddQuestionsModal

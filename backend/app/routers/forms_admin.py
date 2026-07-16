@@ -195,13 +195,11 @@ def add_question(
             detail=f"This collection is set to {form.size} questions and is already full.",
         )
     _check_options(body.type, body.options)
-    # New questions go to the TOP so the creator sees them immediately (a blank
-    # appended to the bottom of a long list is easy to miss). Shift the rest down.
-    for existing in form.questions:
-        existing.position += 1
+    # Append at the end so the survey keeps the creator's add order (= the order
+    # respondents are asked). The frontend scrolls to the new question so it's visible.
     question = Question(
         form_id=form.id,
-        position=0,
+        position=len(form.questions),
         text=body.text,
         type=body.type,
         options=body.options,
