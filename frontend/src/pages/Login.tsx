@@ -28,12 +28,12 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-6">
-      <div className="card w-full max-w-sm p-8">
+      <div className="card animate-pop-in w-full max-w-sm p-8">
         <div className="mb-1 text-center">
-          <Logo size="text-3xl" />
+          <Logo size="text-4xl" />
         </div>
         <p className="mb-8 text-center text-sm text-dim">
-          Ask anything. Just talk.
+          👋 Ask anything. Just talk.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -51,9 +51,9 @@ export default function Login() {
               autoFocus
             />
           </div>
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-coral-deep">{error}</p>}
           <button className="btn-primary w-full" disabled={busy || !password}>
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? "Signing in…" : "Sign in ✨"}
           </button>
         </form>
       </div>

@@ -2,52 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Base look: dark-first, soft white text, comfortable defaults. */
+/* Base look: LIGHT-first, airy lilac wash, deep plum text, comfortable defaults. */
 @layer base {
   body {
-    @apply bg-ink text-fog font-sans antialiased;
+    @apply text-fog font-sans antialiased;
+    background: linear-gradient(180deg, #fbf9ff 0%, #f5f0ff 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
   }
   ::selection {
-    @apply bg-iris/30;
+    @apply bg-glow/25 text-fog;
   }
 }
 
-/* Small set of reusable pieces so pages stay tidy. */
+/* Small set of reusable pieces so pages stay tidy and joyful. */
 @layer components {
   .card {
-    @apply bg-card border border-edge rounded-2xl;
+    @apply rounded-3xl bg-card border border-edge shadow-soft;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
+  /* The star: gradient fill, white text, soft glow, bouncy press. */
   .btn-primary {
-    @apply btn bg-iris text-ink hover:bg-iris-deep hover:text-fog;
+    @apply btn text-white shadow-soft hover:shadow-lift hover:scale-[1.02] active:scale-95;
+    background-image: linear-gradient(135deg, #7c3aed 0%, #d946ef 50%, #fb7185 100%);
   }
   .btn-ghost {
-    @apply btn border border-edge text-dim hover:text-fog hover:border-dim;
+    @apply btn bg-white border border-edge text-dim shadow-soft hover:text-iris hover:border-iris/40 hover:scale-[1.02] active:scale-95;
   }
   .btn-danger {
-    @apply btn border border-edge text-dim hover:text-red-400 hover:border-red-400/50;
+    @apply btn bg-white border border-edge text-dim shadow-soft hover:text-coral-deep hover:border-coral/50 active:scale-95;
   }
   .input {
-    @apply w-full rounded-xl bg-surface border border-edge px-3 py-2 text-sm text-fog placeholder-dim/60 outline-none focus:border-iris/60;
+    @apply w-full rounded-xl bg-white border border-edge px-3 py-2 text-sm text-fog placeholder-dim/60 outline-none transition-shadow focus:border-glow/60 focus:ring-2 focus:ring-glow/30;
   }
   .label {
-    @apply block text-xs font-medium uppercase tracking-wider text-dim mb-1.5;
+    @apply block text-xs font-semibold uppercase tracking-wider text-dim mb-1.5;
   }
   .tag {
-    @apply inline-flex items-center rounded-full border border-edge bg-surface px-2.5 py-0.5 text-xs text-dim;
+    @apply inline-flex items-center rounded-full border border-edge bg-surface px-2.5 py-0.5 text-xs font-medium text-dim;
+  }
+  /* Signature gradient, clipped to text — for logos & key headings. */
+  .gradient-text {
+    background-image: linear-gradient(135deg, #7c3aed 0%, #d946ef 50%, #fb7185 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
   }
 }
 
-/* Slim, unobtrusive scrollbars for the dark theme. */
+/* Slim, soft lilac scrollbars for the light theme. */
 @layer utilities {
   .nice-scroll::-webkit-scrollbar {
     width: 8px;
+    height: 8px;
   }
   .nice-scroll::-webkit-scrollbar-thumb {
-    background: #28303c;
+    background: #ddd2f5;
     border-radius: 8px;
+  }
+  .nice-scroll::-webkit-scrollbar-thumb:hover {
+    background: #c9b8ef;
   }
 }
 
@@ -71,5 +88,16 @@
   30% {
     transform: translateY(-4px);
     opacity: 1;
+  }
+}
+
+/* Respect people who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }

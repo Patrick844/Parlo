@@ -8,6 +8,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import confetti from "canvas-confetti";
 
 import Logo from "../components/Logo";
 import { ApiError, getPublicForm, sendChat } from "../lib/api";
@@ -55,6 +56,18 @@ export default function Chat() {
   useEffect(() => {
     if (!waiting && sessionId && !done) inputRef.current?.focus();
   }, [waiting, sessionId, done, current]);
+
+  // Celebrate completion with a confetti burst in Parlo's gradient colors.
+  useEffect(() => {
+    if (!done) return;
+    const colors = ["#7c3aed", "#d946ef", "#fb7185"];
+    confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors });
+    const t = setTimeout(
+      () => confetti({ particleCount: 60, spread: 100, origin: { y: 0.5 }, colors, scalar: 0.9 }),
+      250,
+    );
+    return () => clearTimeout(t);
+  }, [done]);
 
   const started = sessionId !== null || messages.length > 0;
 

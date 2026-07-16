@@ -14,7 +14,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-edge">
+      <header className="sticky top-0 z-30 border-b border-edge bg-white/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link to="/" aria-label="Dashboard">
             <Logo size="text-xl" />

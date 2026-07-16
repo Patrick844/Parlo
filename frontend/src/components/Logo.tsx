@@ -1,9 +1,10 @@
-/** Text logo: "Parlo" with the signature iris dot. */
+/** Text logo: "Parlo" in the signature gradient with a playful pop dot. */
 
 export default function Logo({ size = "text-2xl" }: { size?: string }) {
   return (
-    <span className={`font-semibold tracking-tight ${size}`}>
-      Parlo<span className="text-iris">.</span>
+    <span className={`font-bold tracking-tight ${size}`}>
+      <span className="gradient-text">Parlo</span>
+      <span className="text-coral">.</span>
     </span>
   );
 }

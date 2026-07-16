@@ -25,20 +25,41 @@ import StatCard from "../components/StatCard";
 import { downloadCsv, getInsights, summarize } from "../lib/api";
 import type { DistributionInsight, Insights, QuestionInsight, Summary } from "../lib/types";
 
-// Validated on the #0e1116 surface with the palette checker.
-const BAR_COLOR = "#7c3aed"; // iris (violet) — categorical/magnitude bars
-const LINE_COLOR = "#e879f9"; // glow (fuchsia) — the time-series line
-const GRID_COLOR = "#28303c";
-const AXIS_COLOR = "#98a2b3";
+// "Playful & Bright" palette — tuned for the light lilac surface.
+const BAR_GRADIENT = "url(#barGrad)"; // violet → fuchsia → coral, the signature gradient (horizontal)
+const BAR_GRADIENT_V = "url(#barGradV)"; // same, oriented for vertical bars
+const LINE_COLOR = "#fb7185"; // coral/rose — the time-series line
+const GRID_COLOR = "#efe8fb"; // light lilac grid
+const AXIS_COLOR = "#6f6790"; // muted purple-gray axis labels
 
 const axisStyle = { fill: AXIS_COLOR, fontSize: 12 };
 const tooltipStyle = {
-  backgroundColor: "#1a202a",
-  border: "1px solid #28303c",
-  borderRadius: 12,
-  color: "#e8ecf1",
+  backgroundColor: "#ffffff",
+  border: "1px solid #ece7fb",
+  borderRadius: 14,
+  color: "#241b3d",
   fontSize: 12,
+  boxShadow: "0 8px 24px -8px rgba(124, 58, 237, 0.25)",
 };
+const cursorFill = { fill: "rgba(124, 58, 237, 0.07)" };
+
+/** Shared <defs> — the signature gradient every bar chart fills from. */
+function GradientDefs() {
+  return (
+    <defs>
+      <linearGradient id="barGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#7c3aed" />
+        <stop offset="50%" stopColor="#d946ef" />
+        <stop offset="100%" stopColor="#fb7185" />
+      </linearGradient>
+      <linearGradient id="barGradV" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stopColor="#7c3aed" />
+        <stop offset="50%" stopColor="#d946ef" />
+        <stop offset="100%" stopColor="#fb7185" />
+      </linearGradient>
+    </defs>
+  );
+}
 
 export default function InsightsPage() {
   const { id = "" } = useParams();
@@ -51,7 +72,7 @@ export default function InsightsPage() {
     getInsights(id).then(setData).catch(() => setError("Couldn't load insights"));
   }, [id]);
 
-  if (error) return <p className="text-red-400">{error}</p>;
+  if (error) return <p className="text-coral-deep">{error}</p>;
   if (!data) return <p className="text-dim">Loading…</p>;
 
   // Overall average rating across all rating questions (weighted by answers).
@@ -80,10 +101,10 @@ export default function InsightsPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to="/" className="text-sm text-dim hover:text-fog">
+          <Link to="/" className="text-sm text-dim hover:text-iris">
             ← All collections
           </Link>
-          <h1 className="mt-1 text-2xl font-semibold">{data.title}</h1>
+          <h1 className="mt-1 text-3xl font-bold">📊 {data.title}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -115,8 +136,8 @@ export default function InsightsPage() {
 
       {/* Responses over time */}
       <div className="card mb-6 p-5">
-        <h2 className="mb-4 text-sm font-medium text-dim">
-          Answers · last 14 days
+        <h2 className="mb-4 text-sm font-semibold text-dim">
+          📈 Answers · last 14 days
         </h2>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={data.answers_by_day} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
@@ -221,6 +242,7 @@ function ChoiceBars({ counts }: { counts: Record<string, number> }) {
   return (
     <ResponsiveContainer width="100%" height={Math.max(120, rows.length * 44)}>
       <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 32, left: 8, bottom: 0 }}>
+        <GradientDefs />
         <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
         <XAxis type="number" tick={axisStyle} axisLine={false} tickLine={false} allowDecimals={false} />
         <YAxis
@@ -231,8 +253,8 @@ function ChoiceBars({ counts }: { counts: Record<string, number> }) {
           axisLine={false}
           tickLine={false}
         />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-        <Bar dataKey="count" name="Answers" fill={BAR_COLOR} radius={[0, 4, 4, 0]} barSize={18}>
+        <Tooltip contentStyle={tooltipStyle} cursor={cursorFill} />
+        <Bar dataKey="count" name="Answers" fill={BAR_GRADIENT} radius={[0, 4, 4, 0]} barSize={18}>
           <LabelList dataKey="count" position="right" style={{ fill: AXIS_COLOR, fontSize: 12 }} />
         </Bar>
       </BarChart>
@@ -249,11 +271,12 @@ function DistributionBars({ counts }: { counts: Record<string, number> }) {
   return (
     <ResponsiveContainer width="100%" height={180}>
       <BarChart data={rows} margin={{ top: 16, right: 8, left: -24, bottom: 0 }}>
+        <GradientDefs />
         <CartesianGrid stroke={GRID_COLOR} vertical={false} />
         <XAxis dataKey="value" tick={axisStyle} axisLine={false} tickLine={false} />
         <YAxis tick={axisStyle} axisLine={false} tickLine={false} allowDecimals={false} />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-        <Bar dataKey="count" name="Answers" fill={BAR_COLOR} radius={[4, 4, 0, 0]} barSize={28}>
+        <Tooltip contentStyle={tooltipStyle} cursor={cursorFill} />
+        <Bar dataKey="count" name="Answers" fill={BAR_GRADIENT_V} radius={[4, 4, 0, 0]} barSize={28}>
           <LabelList dataKey="count" position="top" style={{ fill: AXIS_COLOR, fontSize: 12 }} />
         </Bar>
       </BarChart>
@@ -270,6 +293,7 @@ function AllocationBars({ distribution }: { distribution: DistributionInsight[] 
   return (
     <ResponsiveContainer width="100%" height={Math.max(120, rows.length * 44)}>
       <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 40, left: 8, bottom: 0 }}>
+        <GradientDefs />
         <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
         <XAxis
           type="number"
@@ -286,8 +310,8 @@ function AllocationBars({ distribution }: { distribution: DistributionInsight[] 
           axisLine={false}
           tickLine={false}
         />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-        <Bar dataKey="avg" name="Avg points" fill={BAR_COLOR} radius={[0, 4, 4, 0]} barSize={18}>
+        <Tooltip contentStyle={tooltipStyle} cursor={cursorFill} />
+        <Bar dataKey="avg" name="Avg points" fill={BAR_GRADIENT} radius={[0, 4, 4, 0]} barSize={18}>
           <LabelList dataKey="avg" position="right" style={{ fill: AXIS_COLOR, fontSize: 12 }} />
         </Bar>
       </BarChart>

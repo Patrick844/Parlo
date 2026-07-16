@@ -51,7 +51,7 @@ export default function FormEditor() {
     getForm(id).then(setForm).catch(() => setError("Collection not found"));
   }, [id]);
 
-  if (error) return <p className="text-red-400">{error}</p>;
+  if (error) return <p className="text-coral-deep">{error}</p>;
   if (!form) return <p className="text-dim">Loading…</p>;
 
   /** Persist a header field and mirror it in local state. */
@@ -158,8 +158,8 @@ export default function FormEditor() {
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-dim">
-          Questions
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-dim">
+          📝 Questions
           <span className="ml-2 normal-case tracking-normal text-dim/70">
             {form.questions.length}/{form.size}
           </span>
@@ -175,6 +175,7 @@ export default function FormEditor() {
 
       {form.questions.length === 0 ? (
         <div className="card p-10 text-center text-sm text-dim">
+          <div className="mb-2 text-4xl">🪄</div>
           No questions yet — add your first one above.
         </div>
       ) : (
@@ -326,15 +327,15 @@ function AddQuestionsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-fog/40 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="card flex max-h-[85vh] w-full max-w-2xl flex-col p-6"
+        className="card animate-pop-in flex max-h-[85vh] w-full max-w-2xl flex-col p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-medium text-fog">Add questions</h3>
+          <h3 className="text-lg font-bold text-fog">Add questions</h3>
           <button
             className="btn-ghost px-2 py-1 text-xs"
             onClick={onClose}
@@ -344,7 +345,7 @@ function AddQuestionsModal({
           </button>
         </div>
 
-        {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
+        {error && <p className="mb-3 text-sm text-coral-deep">{error}</p>}
 
         {/* Step 1 — write your own or ask AI */}
         {step === "method" && (
@@ -354,21 +355,21 @@ function AddQuestionsModal({
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <button
-                className="card p-5 text-left transition-colors hover:border-iris/60 disabled:opacity-50"
+                className="card p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-iris/50 hover:shadow-lift disabled:opacity-50"
                 onClick={handleWriteOwn}
                 disabled={busy}
               >
-                <div className="font-medium text-fog">Write my own</div>
+                <div className="font-semibold text-fog">✍️ Write my own</div>
                 <div className="mt-1 text-xs text-dim">
                   Add a blank question and fill it in yourself.
                 </div>
               </button>
               <button
-                className="card p-5 text-left transition-colors hover:border-glow/60 disabled:opacity-50"
+                className="card p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-glow/50 hover:shadow-lift disabled:opacity-50"
                 onClick={() => setStep("topic")}
                 disabled={busy}
               >
-                <div className="font-medium text-fog">Ask AI ✨</div>
+                <div className="font-semibold gradient-text">✨ Ask AI</div>
                 <div className="mt-1 text-xs text-dim">
                   Describe a topic and pick from suggested questions.
                 </div>
@@ -409,7 +410,7 @@ function AddQuestionsModal({
                 onClick={() => void handleGenerate()}
                 disabled={loading || !topic.trim()}
               >
-                {loading ? "Generating…" : "Generate"}
+                {loading ? "Dreaming up questions… ✨" : "Generate ✨"}
               </button>
             </div>
           </div>
@@ -438,11 +439,11 @@ function AddQuestionsModal({
                 return (
                   <div key={group.type}>
                     <div className="mb-2 flex items-center justify-between">
-                      <h4 className="text-xs font-medium uppercase tracking-wider text-dim">
+                      <h4 className="text-xs font-bold uppercase tracking-wider gradient-text">
                         {TYPE_LABELS[group.type]}
                       </h4>
                       <button
-                        className="text-xs text-iris hover:text-glow disabled:opacity-50"
+                        className="text-xs font-semibold text-iris hover:text-glow disabled:opacity-50"
                         onClick={() => setGroup(group.indices, !allOn)}
                         disabled={!allOn && atCap}
                       >
@@ -456,13 +457,15 @@ function AddQuestionsModal({
                         return (
                           <label
                             key={i}
-                            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-                              checked ? "border-iris/60 bg-surface" : "border-edge"
+                            className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition-all ${
+                              checked
+                                ? "border-glow/50 bg-glow/5 ring-1 ring-glow/30"
+                                : "border-edge bg-white hover:border-iris/40 hover:shadow-soft"
                             }`}
                           >
                             <input
                               type="checkbox"
-                              className="mt-0.5 accent-iris"
+                              className="mt-0.5 accent-glow"
                               checked={checked}
                               disabled={!checked && atCap}
                               onChange={() => toggle(i)}
@@ -572,10 +575,10 @@ function QuestionEditor({
   }
 
   return (
-    <div className="card p-5">
+    <div className="card animate-fade-in-up p-5 transition-shadow hover:shadow-lift">
       <div className="flex items-start gap-3">
-        <span className="mt-2 w-6 shrink-0 text-right text-sm text-dim">
-          {index + 1}.
+        <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signature text-xs font-bold text-white">
+          {index + 1}
         </span>
         <div className="min-w-0 flex-1 space-y-3">
           <input
@@ -604,7 +607,7 @@ function QuestionEditor({
                 type="checkbox"
                 checked={question.required}
                 onChange={(e) => save({ required: e.target.checked })}
-                className="accent-iris"
+                className="accent-glow"
               />
               Required
             </label>
@@ -647,7 +650,7 @@ function QuestionEditor({
               </div>
               <button
                 type="button"
-                className="mt-2 flex items-center gap-1.5 text-xs font-medium text-iris hover:text-iris-deep"
+                className="mt-2 flex items-center gap-1.5 rounded-full bg-iris/10 px-3 py-1 text-xs font-semibold text-iris transition-all hover:bg-iris/20 active:scale-95"
                 onClick={addOption}
               >
                 + Add option

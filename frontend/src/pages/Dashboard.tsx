@@ -56,39 +56,43 @@ export default function Dashboard() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Collections</h1>
+          <h1 className="text-3xl font-bold">
+            <span className="gradient-text">Collections</span> 🎈
+          </h1>
           <p className="mt-1 text-sm text-dim">
             Collecting answers, one chat at a time.
           </p>
         </div>
         <button className="btn-primary" onClick={() => setCreating(true)}>
-          + New collection
+          ✨ New collection
         </button>
       </div>
 
       {loading ? (
         <p className="text-dim">Loading…</p>
       ) : forms.length === 0 ? (
-        <div className="card p-12 text-center">
-          <p className="text-lg">Nothing here yet.</p>
-          <p className="mt-1 text-sm text-dim">
+        <div className="card animate-pop-in p-12 text-center">
+          <div className="text-5xl">🌱</div>
+          <p className="mt-4 text-lg font-semibold">Nothing here yet.</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-dim">
             Create your first collection and share the link — respondents
             answer by chatting, not by filling boxes.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {forms.map((item) => {
+          {forms.map((item, i) => {
             const full = item.question_count >= item.size;
             return (
               <div
                 key={item.id}
-                className="card flex flex-wrap items-center gap-4 px-5 py-4"
+                className="card flex flex-wrap items-center gap-4 px-5 py-4 animate-fade-in-up transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift"
+                style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}
               >
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/forms/${item.id}/edit`}
-                    className="font-medium hover:text-iris"
+                    className="font-semibold hover:text-iris"
                   >
                     {item.title}
                   </Link>
@@ -102,9 +106,9 @@ export default function Dashboard() {
                 </div>
 
                 <span
-                  className={`tag ${item.is_open ? "text-iris border-iris/40" : ""}`}
+                  className={`tag ${item.is_open ? "border-iris/30 bg-iris/10 text-iris" : "border-edge bg-surface text-dim"}`}
                 >
-                  {item.is_open ? "Open" : "Closed"}
+                  {item.is_open ? "🟢 Open" : "Closed"}
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -166,11 +170,11 @@ function NewCollectionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-fog/40 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
-      <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <h2 className="mb-4 text-lg font-semibold">New collection</h2>
+      <div className="card animate-pop-in w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-4 text-lg font-bold">✨ New collection</h2>
 
         <label className="label">Name</label>
         <input
@@ -187,7 +191,11 @@ function NewCollectionModal({
             <button
               key={n}
               type="button"
-              className={`btn flex-1 ${size === n ? "bg-iris text-ink" : "border border-edge text-dim hover:text-fog"}`}
+              className={`btn flex-1 transition-all active:scale-95 ${
+                size === n
+                  ? "bg-signature text-white shadow-soft scale-[1.03]"
+                  : "bg-white border border-edge text-dim hover:text-iris hover:border-iris/40"
+              }`}
               onClick={() => setSize(n)}
             >
               {n}
