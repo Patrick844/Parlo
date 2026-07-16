@@ -60,9 +60,11 @@ export default function FormEditor() {
     setForm((f) => (f ? { ...f, ...updated, questions: f.questions } : f));
   }
 
-  /** Append however many questions the add flow just created. */
-  function handleAdded(created: Question[]) {
-    setForm((f) => (f ? { ...f, questions: [...f.questions, ...created] } : f));
+  /** New questions are inserted at the TOP by the backend, so re-fetch to get
+   *  the authoritative order rather than guessing where they landed. */
+  async function handleAdded() {
+    const fresh = await getForm(id);
+    setForm(fresh);
   }
 
   async function handleMove(index: number, direction: -1 | 1) {
@@ -219,7 +221,7 @@ function AddQuestionsModal({
   formId: string;
   size: number;
   remaining: number;
-  onAdded: (created: Question[]) => void;
+  onAdded: () => Promise<void>;
   onClose: () => void;
 }) {
   // The total is fixed at creation, so we don't ask "how many" again — the
@@ -274,18 +276,17 @@ function AddQuestionsModal({
     setBusy(true);
     setError("");
     try {
-      const created: Question[] = [];
-      for (const draft of drafts) {
-        created.push(
-          await addQuestion(formId, {
-            text: draft.text,
-            type: draft.type,
-            options: draft.options,
-            required: draft.required,
-          }),
-        );
+      // Backend inserts each new question at the top, so create in reverse to
+      // land the first-picked question on top and keep the batch's own order.
+      for (const draft of [...drafts].reverse()) {
+        await addQuestion(formId, {
+          text: draft.text,
+          type: draft.type,
+          options: draft.options,
+          required: draft.required,
+        });
       }
-      onAdded(created);
+      await onAdded();
       onClose();
     } catch {
       setError("Couldn't add the questions. Please try again.");

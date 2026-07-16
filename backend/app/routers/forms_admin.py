@@ -126,9 +126,13 @@ def add_question(
             detail=f"This collection is set to {form.size} questions and is already full.",
         )
     _check_options(body.type, body.options)
+    # New questions go to the TOP so the creator sees them immediately (a blank
+    # appended to the bottom of a long list is easy to miss). Shift the rest down.
+    for existing in form.questions:
+        existing.position += 1
     question = Question(
         form_id=form.id,
-        position=len(form.questions),  # append at the end
+        position=0,
         text=body.text,
         type=body.type,
         options=body.options,
