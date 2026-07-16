@@ -1,4 +1,4 @@
-/** Builder: edit a conversation's title, description, and question list. */
+/** Builder: edit a collection's title, description, and question list. */
 
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -39,8 +39,6 @@ const TYPE_ORDER: QuestionType[] = [
   "distribution",
 ];
 
-/** A single form tops out here — kept in sync with the backend cap. */
-const MAX_QUESTIONS = 30;
 
 export default function FormEditor() {
   const { id = "" } = useParams();
@@ -50,7 +48,7 @@ export default function FormEditor() {
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    getForm(id).then(setForm).catch(() => setError("Conversation not found"));
+    getForm(id).then(setForm).catch(() => setError("Collection not found"));
   }, [id]);
 
   if (error) return <p className="text-red-400">{error}</p>;
@@ -103,11 +101,25 @@ export default function FormEditor() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <Link to="/" className="text-sm text-dim hover:text-fog">
-          ← All conversations
+          ← All collections
         </Link>
         <div className="flex items-center gap-2">
-          <button className="btn-ghost text-xs" onClick={handleCopy}>
-            {copied ? "Copied!" : "Copy public link"}
+          {/* Sharing unlocks only once every question slot is filled. */}
+          <button
+            className="btn-ghost text-xs"
+            onClick={handleCopy}
+            disabled={form.questions.length < form.size}
+            title={
+              form.questions.length < form.size
+                ? `Add all ${form.size} questions to share`
+                : ""
+            }
+          >
+            {copied
+              ? "Copied!"
+              : form.questions.length < form.size
+                ? `Locked · ${form.questions.length}/${form.size}`
+                : "Copy public link"}
           </button>
           <button
             className="btn-ghost text-xs"
@@ -149,13 +161,13 @@ export default function FormEditor() {
         <h2 className="text-sm font-medium uppercase tracking-wider text-dim">
           Questions
           <span className="ml-2 normal-case tracking-normal text-dim/70">
-            {form.questions.length}/{MAX_QUESTIONS}
+            {form.questions.length}/{form.size}
           </span>
         </h2>
         <button
           className="btn-primary text-xs"
           onClick={() => setAdding(true)}
-          disabled={form.questions.length >= MAX_QUESTIONS}
+          disabled={form.questions.length >= form.size}
         >
           + Add questions
         </button>
@@ -184,7 +196,8 @@ export default function FormEditor() {
       {adding && (
         <AddQuestionsModal
           formId={id}
-          remaining={MAX_QUESTIONS - form.questions.length}
+          size={form.size}
+          remaining={form.size - form.questions.length}
           onAdded={handleAdded}
           onClose={() => setAdding(false)}
         />
@@ -193,23 +206,25 @@ export default function FormEditor() {
   );
 }
 
-/** The add-questions flow: pick a count, then write your own blanks or ask the
- *  AI for a batch you cherry-pick from (grouped by question type). */
+/** The add-questions flow: write your own blank questions, or ask the AI for a
+ *  batch you cherry-pick from (grouped by question type) to fill the collection. */
 function AddQuestionsModal({
   formId,
+  size,
   remaining,
   onAdded,
   onClose,
 }: {
   formId: string;
+  size: number;
   remaining: number;
   onAdded: (created: Question[]) => void;
   onClose: () => void;
 }) {
-  type Step = "count" | "method" | "topic" | "suggestions";
-  const cap = Math.min(MAX_QUESTIONS, remaining);
-  const [step, setStep] = useState<Step>("count");
-  const [count, setCount] = useState(Math.min(5, cap));
+  // The total is fixed at creation, so we don't ask "how many" again — the
+  // creator just picks a method, and the AI fills the remaining slots.
+  type Step = "method" | "topic" | "suggestions";
+  const [step, setStep] = useState<Step>("method");
   const [topic, setTopic] = useState("");
   const [suggestions, setSuggestions] = useState<SuggestedQuestion[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -278,14 +293,10 @@ function AddQuestionsModal({
   }
 
   function handleWriteOwn() {
-    // Seed `count` blank questions the creator then fills in inline.
-    const blanks: SuggestedQuestion[] = Array.from({ length: count }, () => ({
-      text: "Untitled question",
-      type: "text",
-      options: [],
-      required: true,
-    }));
-    void createFrom(blanks);
+    // Add a single blank question the creator fills inline, then repeat as needed.
+    void createFrom([
+      { text: "Untitled question", type: "text", options: [], required: true },
+    ]);
   }
 
   async function handleGenerate() {
@@ -293,7 +304,7 @@ function AddQuestionsModal({
     setLoading(true);
     setError("");
     try {
-      const result = await suggestQuestions(formId, topic.trim(), count);
+      const result = await suggestQuestions(formId, topic.trim(), remaining);
       if (result.suggestions.length === 0) {
         setError("The AI didn't return anything usable — try a different topic.");
       } else {
@@ -335,38 +346,11 @@ function AddQuestionsModal({
 
         {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
 
-        {/* Step 1 — how many */}
-        {step === "count" && (
-          <div className="space-y-4">
-            <div>
-              <label className="label">How many questions?</label>
-              <input
-                className="input w-32"
-                type="number"
-                min={1}
-                max={cap}
-                value={count}
-                onChange={(e) =>
-                  setCount(Math.max(1, Math.min(cap, Number(e.target.value) || 1)))
-                }
-              />
-              <p className="mt-1.5 text-xs text-dim">
-                {remaining} of {MAX_QUESTIONS} slots left on this conversation.
-              </p>
-            </div>
-            <div className="flex justify-end">
-              <button className="btn-primary text-sm" onClick={() => setStep("method")}>
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 — write your own or ask AI */}
+        {/* Step 1 — write your own or ask AI */}
         {step === "method" && (
           <div className="space-y-4">
             <p className="text-sm text-dim">
-              How do you want to create {count} question{count === 1 ? "" : "s"}?
+              {remaining} of {size} question{size === 1 ? "" : "s"} left to add.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <button
@@ -376,7 +360,7 @@ function AddQuestionsModal({
               >
                 <div className="font-medium text-fog">Write my own</div>
                 <div className="mt-1 text-xs text-dim">
-                  Start with blank questions and fill them in yourself.
+                  Add a blank question and fill it in yourself.
                 </div>
               </button>
               <button
@@ -388,11 +372,6 @@ function AddQuestionsModal({
                 <div className="mt-1 text-xs text-dim">
                   Describe a topic and pick from suggested questions.
                 </div>
-              </button>
-            </div>
-            <div>
-              <button className="btn-ghost text-sm" onClick={() => setStep("count")}>
-                Back
               </button>
             </div>
           </div>
@@ -413,8 +392,8 @@ function AddQuestionsModal({
                 disabled={loading}
               />
               <p className="mt-1.5 text-xs text-dim">
-                We'll draft up to {count} question{count === 1 ? "" : "s"} across a
-                mix of answer types.
+                We'll draft up to {remaining} question{remaining === 1 ? "" : "s"} across
+                a mix of answer types — pick the ones you want.
               </p>
             </div>
             <div className="flex justify-between">
@@ -552,7 +531,8 @@ function QuestionEditor({
   onSaved: (question: Question) => void;
 }) {
   const [text, setText] = useState(question.text);
-  const [optionsText, setOptionsText] = useState(question.options.join("\n"));
+  // Local, editable copy of the options list. Each option is its own field.
+  const [options, setOptions] = useState<string[]>(question.options);
   const hasOptions = OPTION_TYPES.includes(question.type);
 
   async function save(changes: Parameters<typeof updateQuestion>[1]) {
@@ -562,21 +542,33 @@ function QuestionEditor({
 
   async function handleTypeChange(type: QuestionType) {
     // Switching to a choice/distribution type needs options; give it a starter pair.
-    const options = OPTION_TYPES.includes(type)
+    const next = OPTION_TYPES.includes(type)
       ? question.options.length >= 2
         ? question.options
         : ["Option A", "Option B"]
       : [];
-    setOptionsText(options.join("\n"));
-    await save({ type, options });
+    setOptions(next);
+    await save({ type, options: next });
   }
 
-  async function handleOptionsBlur() {
-    const options = optionsText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (options.length >= 2) await save({ options });
+  // Persist the options list, but only when it's still valid (>= 2 non-empty).
+  async function persistOptions(next: string[]) {
+    const cleaned = next.map((o) => o.trim()).filter(Boolean);
+    if (cleaned.length >= 2) await save({ options: cleaned });
+  }
+
+  function updateOption(i: number, value: string) {
+    setOptions((prev) => prev.map((o, idx) => (idx === i ? value : o)));
+  }
+
+  function addOption() {
+    setOptions((prev) => [...prev, ""]);
+  }
+
+  async function removeOption(i: number) {
+    const next = options.filter((_, idx) => idx !== i);
+    setOptions(next);
+    await persistOptions(next);
   }
 
   return (
@@ -612,7 +604,7 @@ function QuestionEditor({
                 type="checkbox"
                 checked={question.required}
                 onChange={(e) => save({ required: e.target.checked })}
-                className="accent-[#34d399]"
+                className="accent-iris"
               />
               Required
             </label>
@@ -627,14 +619,39 @@ function QuestionEditor({
 
           {hasOptions && (
             <div>
-              <label className="label">Options (one per line, at least two)</label>
-              <textarea
-                className="input resize-none font-mono text-xs"
-                rows={Math.max(3, optionsText.split("\n").length)}
-                value={optionsText}
-                onChange={(e) => setOptionsText(e.target.value)}
-                onBlur={handleOptionsBlur}
-              />
+              <label className="label">Options (at least two)</label>
+              <div className="space-y-2">
+                {options.map((option, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="w-5 shrink-0 text-center text-xs text-dim">
+                      {i + 1}
+                    </span>
+                    <input
+                      className="input flex-1"
+                      placeholder={`Option ${i + 1}`}
+                      value={option}
+                      onChange={(e) => updateOption(i, e.target.value)}
+                      onBlur={() => persistOptions(options)}
+                    />
+                    <button
+                      type="button"
+                      className="btn-danger px-2 py-1 text-xs"
+                      onClick={() => removeOption(i)}
+                      disabled={options.length <= 2}
+                      aria-label="Remove option"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="mt-2 flex items-center gap-1.5 text-xs font-medium text-iris hover:text-iris-deep"
+                onClick={addOption}
+              >
+                + Add option
+              </button>
             </div>
           )}
         </div>

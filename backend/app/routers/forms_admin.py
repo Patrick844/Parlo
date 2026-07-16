@@ -25,7 +25,9 @@ from ..schemas import (
 )
 
 # A single form tops out at this many questions.
-MAX_QUESTIONS = 30
+# A collection's question count is capped per-collection by its own `size`
+# (chosen at creation); this is only the hard upper bound the API will accept.
+MAX_QUESTIONS = 50
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -67,6 +69,7 @@ def list_forms(db: DbSession = Depends(get_db)) -> list[FormListItem]:
                 title=form.title,
                 slug=form.slug,
                 is_open=form.is_open,
+                size=form.size,
                 created_at=form.created_at,
                 question_count=len(form.questions),
                 respondents=started,
@@ -79,7 +82,7 @@ def list_forms(db: DbSession = Depends(get_db)) -> list[FormListItem]:
 
 @router.post("/forms", response_model=FormOut, status_code=201)
 def create_form(body: FormCreate, db: DbSession = Depends(get_db)) -> Form:
-    form = Form(title=body.title, description=body.description)
+    form = Form(title=body.title, description=body.description, size=body.size)
     db.add(form)
     db.commit()
     db.refresh(form)
@@ -117,10 +120,10 @@ def add_question(
     form_id: str, body: QuestionCreate, db: DbSession = Depends(get_db)
 ) -> Question:
     form = get_form_or_404(db, form_id)
-    if len(form.questions) >= MAX_QUESTIONS:
+    if len(form.questions) >= form.size:
         raise HTTPException(
             status_code=400,
-            detail=f"A conversation can have at most {MAX_QUESTIONS} questions.",
+            detail=f"This collection is set to {form.size} questions and is already full.",
         )
     _check_options(body.type, body.options)
     question = Question(
@@ -191,11 +194,11 @@ def suggest_questions(
     """Draft questions about a topic. Nothing is persisted — the creator picks
     which suggestions to keep, and those go through the normal create path."""
     form = get_form_or_404(db, form_id)
-    remaining = MAX_QUESTIONS - len(form.questions)
+    remaining = form.size - len(form.questions)
     if remaining <= 0:
         raise HTTPException(
             status_code=400,
-            detail=f"This conversation already has the maximum of {MAX_QUESTIONS} questions.",
+            detail=f"This collection is set to {form.size} questions and is already full.",
         )
 
     # Clamp the request to what the form can still hold.

@@ -91,12 +91,14 @@ class SuggestQuestionsResponse(BaseModel):
 class FormCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = ""
+    size: int = Field(default=10, ge=1, le=50)  # total questions for this collection
 
 
 class FormUpdate(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
     is_open: Optional[bool] = None
+    size: Optional[int] = Field(default=None, ge=1, le=50)
 
 
 class FormOut(BaseModel):
@@ -107,6 +109,7 @@ class FormOut(BaseModel):
     description: str
     slug: str
     is_open: bool
+    size: int
     created_at: datetime
     questions: list[QuestionOut]
 
@@ -118,6 +121,7 @@ class FormListItem(BaseModel):
     title: str
     slug: str
     is_open: bool
+    size: int
     created_at: datetime
     question_count: int
     respondents: int          # sessions started
@@ -139,11 +143,33 @@ class PublicForm(BaseModel):
 class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     message: Optional[str] = Field(default=None, max_length=4000)
+    # "Go back / edit": jump to an already-answered question to change it.
+    goto_question_id: Optional[str] = None
+
+
+class CurrentQuestion(BaseModel):
+    """The single question the respondent should answer right now."""
+
+    id: str
+    text: str
+    type: QuestionType
+    options: list[str] = []
+    required: bool
+    position: int  # 1-based, for display ("Question 3 of 5")
+    total: int
+
+
+class ChatProgress(BaseModel):
+    answered: int
+    total: int
 
 
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
+    # The question to render a widget for now; null once the conversation is done.
+    question: Optional[CurrentQuestion] = None
+    progress: ChatProgress
     done: bool
 
 

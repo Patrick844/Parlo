@@ -88,10 +88,10 @@ export async function login(password: string): Promise<void> {
 export const listForms = () =>
   request<FormListItem[]>("/api/admin/forms", { auth: true });
 
-export const createForm = (title: string, description = "") =>
+export const createForm = (title: string, size = 10, description = "") =>
   request<Form>("/api/admin/forms", {
     method: "POST",
-    body: { title, description },
+    body: { title, description, size },
     auth: true,
   });
 
@@ -188,10 +188,19 @@ export async function downloadCsv(formId: string, filename: string): Promise<voi
 export const getPublicForm = (slug: string) =>
   request<PublicForm>(`/api/forms/${slug}`);
 
-export const sendChat = (slug: string, sessionId: string | null, message: string | null) =>
+export const sendChat = (
+  slug: string,
+  sessionId: string | null,
+  message: string | null,
+  gotoQuestionId: string | null = null,
+) =>
   request<ChatResponse>(`/api/chat/${slug}`, {
     method: "POST",
-    body: { session_id: sessionId, message },
+    body: {
+      session_id: sessionId,
+      message,
+      goto_question_id: gotoQuestionId,
+    },
   });
 
 /** The public link a creator shares. */

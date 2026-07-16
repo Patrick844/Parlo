@@ -81,7 +81,7 @@ export default function InsightsPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link to="/" className="text-sm text-dim hover:text-fog">
-            ← All conversations
+            ← All collections
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">{data.title}</h1>
         </div>

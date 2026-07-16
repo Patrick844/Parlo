@@ -41,6 +41,8 @@ class Form(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     slug: Mapped[str] = mapped_column(String(16), unique=True, index=True, default=new_slug)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Target number of questions for this collection, chosen at creation (e.g. 5/10/20).
+    size: Mapped[int] = mapped_column(Integer, default=10)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     questions: Mapped[list["Question"]] = relationship(
@@ -80,6 +82,12 @@ class Session(Base):
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     # A list of {"role": "user"|"assistant", "content": "..."} dicts.
     history: Mapped[list] = mapped_column(JSON, default=list)
+    # Ids of OPTIONAL questions the respondent explicitly declined to answer.
+    # The "current" question is the first one that is neither answered nor here.
+    declined: Mapped[list] = mapped_column(JSON, default=list)
+    # A one-shot override: when set to a question id, that question becomes the
+    # current one for the NEXT answer (used by "go back / edit"). Cleared after.
+    cursor: Mapped[str | None] = mapped_column(String(36), nullable=True, default=None)
 
     form: Mapped[Form] = relationship(back_populates="sessions")
     answers: Mapped[list["Answer"]] = relationship(

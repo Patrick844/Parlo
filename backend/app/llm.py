@@ -1,13 +1,18 @@
 """All OpenAI calls live here.
 
-Three jobs:
-  1. `chat_turn` — drive the respondent conversation. The model must answer
-     with STRICT JSON ({reply, question_id, answer, done}) so the backend can
-     validate and store answers itself.
-  2. `summarize_answers` — turn a form's collected answers into a short list
-     of insights + an overall sentiment for the dashboard.
-  3. `suggest_questions` — draft a batch of questions about a topic, grouped by
-     category and tagged with a type, for the builder's AI generator.
+The backend owns the interview flow; the model is only used for phrasing and
+for parsing free-text answers. Each call is small and single-purpose:
+
+  1. `compose_intro`    — a warm one-line intro (states count + topic).
+  2. `phrase_question`  — a short, warm way to ASK one specific question.
+  3. `explain_question` — re-explain the current question in simpler words.
+  4. `extract_answer`   — parse a TYPED free-text reply into a normalized value
+                          (and flag decline / help intents).
+  5. `summarize_answers`— dashboard insights + overall sentiment.
+  6. `suggest_questions`— draft a batch of questions for the builder.
+
+Phrasing calls fall back to plain deterministic text if the model is
+unavailable, so the deterministic flow never breaks on a phrasing hiccup.
 """
 
 import json
@@ -34,75 +39,199 @@ def get_client() -> OpenAI:
     return _client
 
 
-def build_system_prompt(
-    title: str, description: str, questions: list[Question], answered_ids: set[str]
-) -> str:
-    """Everything the model needs to run one interview turn."""
+def _answer_hint(question: Question) -> str:
+    """A short natural-language hint about what a good answer looks like."""
+    t = question.type
+    if t in ("single_choice", "multi_choice", "distribution"):
+        opts = ", ".join(question.options or [])
+        if t == "single_choice":
+            return f"They pick one of: {opts}."
+        if t == "multi_choice":
+            return f"They pick one or more of: {opts}."
+        return f"They split 100 points across: {opts}."
+    if t == "rating":
+        return "They give a whole number from 1 to 5."
+    if t == "number":
+        return "They give a number."
+    if t == "email":
+        return "They give an email address."
+    return "They answer in their own words."
 
-    question_lines = []
-    for q in questions:
-        entry: dict = {
-            "id": q.id,
-            "text": q.text,
-            "type": q.type,
-            "required": q.required,
-            "already_answered": q.id in answered_ids,
-        }
-        if q.type in ("single_choice", "multi_choice", "distribution"):
-            entry["options"] = q.options
-        question_lines.append(json.dumps(entry, ensure_ascii=False))
 
-    return (
-        "You are Parlo, a warm and concise conversational interviewer. "
-        f'You are collecting answers for a conversation titled "{title}".\n'
-        + (f"Context from the creator: {description}\n" if description else "")
-        + "\nQUESTIONS (ask them in order, one at a time, skipping ones already answered):\n"
-        + "\n".join(question_lines)
-        + "\n\nRULES:\n"
-        "- Keep replies short and friendly (1-3 sentences). Ask exactly one question per turn.\n"
-        "- For choice questions, list the options naturally in your reply.\n"
-        "- For rating questions, ask for a number from 1 to 5.\n"
-        "- For distribution questions, help the respondent split 100 points across the\n"
-        "  question's options (the points must add up to 100); list the options in your reply.\n"
-        "- When the respondent's latest message answers the current question, extract a\n"
-        "  normalized value: single_choice → exactly one option string; multi_choice → an\n"
-        "  array of option strings; rating → an integer 1-5; number → a number; email → the\n"
-        "  address string; distribution → an object mapping each option string to its number\n"
-        "  of points (all points summing to 100); text → their answer as a string.\n"
-        "- A respondent may decline an optional (required=false) question; acknowledge and\n"
-        "  move on. Gently re-ask required ones.\n"
-        "- Never invent answers. If their message is unclear, set answer to null and ask again.\n"
-        "- After the final question is answered, thank them briefly and set done to true.\n"
-        "\nOUTPUT: respond ONLY with a JSON object of this exact shape:\n"
-        '{"reply": string,            // what to say to the respondent next\n'
-        ' "question_id": string|null, // the question their LATEST message answered, else null\n'
-        ' "answer": any|null,         // the normalized value for that question, else null\n'
-        ' "done": boolean}            // true only when the whole conversation is finished'
+def compose_intro(title: str, description: str, total: int) -> str:
+    """A short, warm opening line that states how many questions and the topic."""
+    plural = "question" if total == 1 else "questions"
+    fallback = (
+        f"Hi! You'll answer {total} quick {plural} about “{title}”. "
+        "Answer by tapping or typing — ready when you are!"
     )
-
-
-def chat_turn(system_prompt: str, history: list[dict]) -> dict:
-    """One model turn. Returns the parsed JSON dict (with safe fallbacks)."""
-
-    response = get_client().chat.completions.create(
-        model=settings.openai_model,
-        messages=[{"role": "system", "content": system_prompt}, *history],
-        response_format={"type": "json_object"},
-        temperature=0.4,
-    )
-    raw = response.choices[0].message.content or "{}"
     try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        data = {}
+        response = get_client().chat.completions.create(
+            model=settings.openai_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Parlo, a warm, concise conversational interviewer. "
+                        "Write ONE friendly opening sentence (max 2) that greets the "
+                        f"respondent, mentions they'll answer {total} {plural}, and "
+                        "names the topic. Do NOT ask the first question yet. Plain "
+                        "text only, no quotes around your reply."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f'Title: "{title}"\n'
+                        + (f"Context: {description}\n" if description else "")
+                        + f"Number of questions: {total}"
+                    ),
+                },
+            ],
+            temperature=0.5,
+        )
+        text = (response.choices[0].message.content or "").strip()
+        return text or fallback
+    except Exception:
+        return fallback
 
-    # Defensive defaults — the backend never assumes the model behaved.
-    return {
-        "reply": data.get("reply") or "Sorry, could you say that again?",
-        "question_id": data.get("question_id"),
-        "answer": data.get("answer"),
-        "done": bool(data.get("done")),
-    }
+
+def phrase_question(
+    title: str, question: Question, position: int, total: int, is_first: bool
+) -> str:
+    """A short, warm way to ASK this specific question.
+
+    The widget renders the options/scale, so this stays brief. Non-first turns
+    may open with a tiny, varied acknowledgement. Falls back to the raw text.
+    """
+    fallback = str(question.text)
+    ack = (
+        "Ask this question directly."
+        if is_first
+        else "You may open with a brief, varied acknowledgement (e.g. 'Got it.', "
+        "'Thanks!', 'Perfect.') then ask the question."
+    )
+    try:
+        response = get_client().chat.completions.create(
+            model=settings.openai_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Parlo, a warm, concise conversational interviewer "
+                        f'collecting answers for "{title}". Rephrase the given question '
+                        "as ONE short, friendly sentence to ask the respondent now. "
+                        f"{ack} The answer widget already shows any options, so do not "
+                        "list them all — keep it brief. Plain text only, no quotes."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Question {position} of {total}: {question.text}\n"
+                        f"({_answer_hint(question)})"
+                    ),
+                },
+            ],
+            temperature=0.4,
+        )
+        text = (response.choices[0].message.content or "").strip()
+        return text or fallback
+    except Exception:
+        return fallback
+
+
+def explain_question(title: str, question: Question) -> str:
+    """Re-explain / clarify the CURRENT question in simpler words on request."""
+    fallback = (
+        f"Sure — in other words: {question.text} " + _answer_hint(question)
+    )
+    try:
+        response = get_client().chat.completions.create(
+            model=settings.openai_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Parlo, a warm, patient interviewer. The respondent "
+                        "asked for help understanding the current question. Explain "
+                        "what it's asking in simpler, plainer words (1-2 sentences), "
+                        "then invite them to answer. Plain text only, no quotes."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f'Conversation: "{title}"\nQuestion: {question.text}\n'
+                        f"What a good answer looks like: {_answer_hint(question)}"
+                    ),
+                },
+            ],
+            temperature=0.4,
+        )
+        text = (response.choices[0].message.content or "").strip()
+        return text or fallback
+    except Exception:
+        return fallback
+
+
+def extract_answer(question: Question, user_text: str) -> dict:
+    """Parse a TYPED free-text reply into a normalized value for `question`.
+
+    Returns {"value": <normalized|None>, "declined": bool, "needs_help": bool}.
+    Never called for `text` questions (those are stored verbatim). On any error
+    it returns an all-empty result so the backend simply re-asks.
+    """
+    empty = {"value": None, "declined": False, "needs_help": False}
+    options = question.options or []
+    shape = {
+        "single_choice": "exactly one option string from the list",
+        "multi_choice": "an array of option strings from the list",
+        "rating": "an integer from 1 to 5",
+        "number": "a number",
+        "email": "the email address as a string",
+        "distribution": (
+            "an object mapping each option string to its points (all points "
+            "summing to 100)"
+        ),
+    }.get(question.type, "their answer as a string")
+
+    try:
+        response = get_client().chat.completions.create(
+            model=settings.openai_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You parse a respondent's reply to ONE survey question into a "
+                        "normalized value. Reply ONLY with JSON of this shape:\n"
+                        '{"value": <normalized value or null>, '
+                        '"declined": <true if they refuse/skip this question>, '
+                        '"needs_help": <true if they are confused or asking what the '
+                        'question means rather than answering>}\n'
+                        f"For THIS question the value must be {shape}. "
+                        + (f"Allowed options: {json.dumps(options)}. " if options else "")
+                        + "If the reply doesn't contain a usable answer, set value to "
+                        "null. Never invent an answer."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Question: {question.text}\nReply: {user_text}",
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+        raw = response.choices[0].message.content or "{}"
+        data = json.loads(raw)
+        return {
+            "value": data.get("value"),
+            "declined": bool(data.get("declined")),
+            "needs_help": bool(data.get("needs_help")),
+        }
+    except Exception:
+        return empty
 
 
 def summarize_answers(title: str, digest: str) -> dict:

@@ -24,6 +24,7 @@ export interface Form {
   description: string;
   slug: string;
   is_open: boolean;
+  size: number;
   created_at: string;
   questions: Question[];
 }
@@ -34,6 +35,7 @@ export interface FormListItem {
   title: string;
   slug: string;
   is_open: boolean;
+  size: number;
   created_at: string;
   question_count: number;
   respondents: number;
@@ -49,9 +51,27 @@ export interface PublicForm {
   is_open: boolean;
 }
 
+/** The single question the respondent should answer right now. */
+export interface CurrentQuestion {
+  id: string;
+  text: string;
+  type: QuestionType;
+  options: string[];
+  required: boolean;
+  position: number; // 1-based
+  total: number;
+}
+
+export interface ChatProgress {
+  answered: number;
+  total: number;
+}
+
 export interface ChatResponse {
   session_id: string;
   reply: string;
+  question: CurrentQuestion | null; // null once the conversation is done
+  progress: ChatProgress;
   done: boolean;
 }
 
