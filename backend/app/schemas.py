@@ -9,7 +9,9 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-QuestionType = Literal["text", "single_choice", "multi_choice", "rating", "number", "email"]
+QuestionType = Literal[
+    "text", "single_choice", "multi_choice", "rating", "number", "email", "distribution"
+]
 
 
 # ---------- auth ----------
@@ -147,6 +149,13 @@ class ChatResponse(BaseModel):
 
 # ---------- insights ----------
 
+class OptionAverage(BaseModel):
+    """One row of a distribution question's mean allocation, e.g. Salary → 37.5."""
+
+    option: str
+    avg: float
+
+
 class QuestionInsight(BaseModel):
     question_id: str
     text: str
@@ -158,6 +167,8 @@ class QuestionInsight(BaseModel):
     average: Optional[float] = None
     # text / email → the raw values
     values: list[str] = []
+    # distribution → average points allocated to each option
+    distribution: list[OptionAverage] = []
 
 
 class DayCount(BaseModel):

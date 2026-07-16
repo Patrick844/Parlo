@@ -77,6 +77,32 @@ def validate_answer(question: Question, value: object) -> ValidationResult:
             return True, picked_list, ""
         return _fail("Could you pick at least one of: " + ", ".join(options) + "?")
 
+    if question.type == "distribution":
+        # A mapping of option → points; every key must be a known option, every
+        # value a number >= 0, and the whole thing must add up to 100.
+        options = question.options or []
+        needs_100 = "Assign points to each option so they add up to 100."
+        if not isinstance(value, dict):
+            return _fail(needs_100)
+        allocation: dict = {}
+        total = 0.0
+        for key, raw in value.items():
+            picked = _match_option(key, options)
+            if picked is None:
+                return _fail(needs_100)
+            try:
+                number = float(raw)
+            except (TypeError, ValueError):
+                return _fail(needs_100)
+            if number < 0:
+                return _fail(needs_100)
+            # Store whole points as ints so 40 doesn't become 40.0 in exports.
+            allocation[picked] = int(number) if number.is_integer() else number
+            total += number
+        if abs(total - 100) >= 0.5:
+            return _fail(needs_100)
+        return True, allocation, ""
+
     return _fail("I didn't quite catch that — could you rephrase?")
 
 

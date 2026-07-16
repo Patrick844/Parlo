@@ -22,9 +22,11 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   rating: "Rating (1–5)",
   number: "Number",
   email: "Email",
+  distribution: "Distribution (allocate 100)",
 };
 
-const CHOICE_TYPES: QuestionType[] = ["single_choice", "multi_choice"];
+/** Types that carry an options list (one per line, at least two). */
+const OPTION_TYPES: QuestionType[] = ["single_choice", "multi_choice", "distribution"];
 
 /** Fixed order the AI suggestions are grouped into, by question type. */
 const TYPE_ORDER: QuestionType[] = [
@@ -34,6 +36,7 @@ const TYPE_ORDER: QuestionType[] = [
   "rating",
   "number",
   "email",
+  "distribution",
 ];
 
 /** A single form tops out here — kept in sync with the backend cap. */
@@ -550,7 +553,7 @@ function QuestionEditor({
 }) {
   const [text, setText] = useState(question.text);
   const [optionsText, setOptionsText] = useState(question.options.join("\n"));
-  const isChoice = CHOICE_TYPES.includes(question.type);
+  const hasOptions = OPTION_TYPES.includes(question.type);
 
   async function save(changes: Parameters<typeof updateQuestion>[1]) {
     const saved = await updateQuestion(question.id, changes);
@@ -558,8 +561,8 @@ function QuestionEditor({
   }
 
   async function handleTypeChange(type: QuestionType) {
-    // Switching to a choice type needs options; give it a starter pair.
-    const options = CHOICE_TYPES.includes(type)
+    // Switching to a choice/distribution type needs options; give it a starter pair.
+    const options = OPTION_TYPES.includes(type)
       ? question.options.length >= 2
         ? question.options
         : ["Option A", "Option B"]
@@ -617,9 +620,12 @@ function QuestionEditor({
             {question.type === "rating" && (
               <span className="tag">Scale is always 1–5</span>
             )}
+            {question.type === "distribution" && (
+              <span className="tag">Respondents split 100 across these</span>
+            )}
           </div>
 
-          {isChoice && (
+          {hasOptions && (
             <div>
               <label className="label">Options (one per line, at least two)</label>
               <textarea

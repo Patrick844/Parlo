@@ -23,7 +23,7 @@ import {
 
 import StatCard from "../components/StatCard";
 import { downloadCsv, getInsights, summarize } from "../lib/api";
-import type { Insights, QuestionInsight, Summary } from "../lib/types";
+import type { DistributionInsight, Insights, QuestionInsight, Summary } from "../lib/types";
 
 // Validated on the #0e1116 surface with the palette checker.
 const BAR_COLOR = "#7c3aed"; // iris (violet) — categorical/magnitude bars
@@ -197,6 +197,8 @@ function QuestionPanel({ question, index }: { question: QuestionInsight; index: 
         <ChoiceBars counts={question.counts} />
       ) : question.type === "rating" || question.type === "number" ? (
         <DistributionBars counts={question.counts} />
+      ) : question.type === "distribution" ? (
+        <AllocationBars distribution={question.distribution} />
       ) : question.values.length > 0 ? (
         <ul className="nice-scroll max-h-64 space-y-2 overflow-y-auto pr-2">
           {question.values.map((value, i) => (
@@ -253,6 +255,40 @@ function DistributionBars({ counts }: { counts: Record<string, number> }) {
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
         <Bar dataKey="count" name="Answers" fill={BAR_COLOR} radius={[4, 4, 0, 0]} barSize={28}>
           <LabelList dataKey="count" position="top" style={{ fill: AXIS_COLOR, fontSize: 12 }} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Horizontal bars — average points allocated to each option (sums to ~100). */
+function AllocationBars({ distribution }: { distribution: DistributionInsight[] }) {
+  const rows = distribution.map(({ option, avg }) => ({ option, avg }));
+  if (rows.every((row) => row.avg === 0)) {
+    return <p className="text-sm text-dim">No allocations yet.</p>;
+  }
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(120, rows.length * 44)}>
+      <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 40, left: 8, bottom: 0 }}>
+        <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
+        <XAxis
+          type="number"
+          domain={[0, 100]}
+          tick={axisStyle}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          type="category"
+          dataKey="option"
+          tick={axisStyle}
+          width={140}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+        <Bar dataKey="avg" name="Avg points" fill={BAR_COLOR} radius={[0, 4, 4, 0]} barSize={18}>
+          <LabelList dataKey="avg" position="right" style={{ fill: AXIS_COLOR, fontSize: 12 }} />
         </Bar>
       </BarChart>
     </ResponsiveContainer>

@@ -6,7 +6,8 @@ export type QuestionType =
   | "multi_choice"
   | "rating"
   | "number"
-  | "email";
+  | "email"
+  | "distribution";
 
 export interface Question {
   id: string;
@@ -54,6 +55,12 @@ export interface ChatResponse {
   done: boolean;
 }
 
+/** One option's mean allocation for a distribution question. */
+export interface DistributionInsight {
+  option: string;
+  avg: number;
+}
+
 export interface QuestionInsight {
   question_id: string;
   text: string;
@@ -62,6 +69,7 @@ export interface QuestionInsight {
   counts: Record<string, number>;
   average: number | null;
   values: string[];
+  distribution: DistributionInsight[];
 }
 
 export interface DayCount {

@@ -213,10 +213,10 @@ def suggest_questions(
 
 
 def _check_options(question_type: str, options: list) -> None:
-    """Choice questions need at least two options; other types ignore them."""
-    if question_type in ("single_choice", "multi_choice") and len(options or []) < 2:
+    """Choice and distribution questions need at least two options; others ignore them."""
+    if question_type in ("single_choice", "multi_choice", "distribution") and len(options or []) < 2:
         raise HTTPException(
-            status_code=400, detail="Choice questions need at least two options"
+            status_code=400, detail="Choice and distribution questions need at least two options"
         )
 
 

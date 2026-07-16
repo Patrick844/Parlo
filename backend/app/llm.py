@@ -20,7 +20,9 @@ from .models import Question
 _client: OpenAI | None = None
 
 # The question types the builder understands; anything else is coerced to text.
-_VALID_TYPES = {"text", "single_choice", "multi_choice", "rating", "number", "email"}
+_VALID_TYPES = {
+    "text", "single_choice", "multi_choice", "rating", "number", "email", "distribution"
+}
 MAX_SUGGESTIONS = 30
 
 
@@ -46,7 +48,7 @@ def build_system_prompt(
             "required": q.required,
             "already_answered": q.id in answered_ids,
         }
-        if q.type in ("single_choice", "multi_choice"):
+        if q.type in ("single_choice", "multi_choice", "distribution"):
             entry["options"] = q.options
         question_lines.append(json.dumps(entry, ensure_ascii=False))
 
@@ -60,10 +62,13 @@ def build_system_prompt(
         "- Keep replies short and friendly (1-3 sentences). Ask exactly one question per turn.\n"
         "- For choice questions, list the options naturally in your reply.\n"
         "- For rating questions, ask for a number from 1 to 5.\n"
+        "- For distribution questions, help the respondent split 100 points across the\n"
+        "  question's options (the points must add up to 100); list the options in your reply.\n"
         "- When the respondent's latest message answers the current question, extract a\n"
         "  normalized value: single_choice → exactly one option string; multi_choice → an\n"
         "  array of option strings; rating → an integer 1-5; number → a number; email → the\n"
-        "  address string; text → their answer as a string.\n"
+        "  address string; distribution → an object mapping each option string to its number\n"
+        "  of points (all points summing to 100); text → their answer as a string.\n"
         "- A respondent may decline an optional (required=false) question; acknowledge and\n"
         "  move on. Gently re-ask required ones.\n"
         "- Never invent answers. If their message is unclear, set answer to null and ask again.\n"
@@ -157,17 +162,18 @@ def suggest_questions(topic: str, count: int) -> list[dict]:
                     "non-overlapping questions and spread them across these "
                     "question types, picking whichever best fits each question: "
                     "text (short free text), single_choice, multi_choice, rating "
-                    "(a 1-5 scale), number, and email. Use a good mix of types "
-                    "rather than leaning on just one.\n"
-                    "For single_choice and multi_choice, fill options with at "
-                    "least two real, concise, topic-relevant candidate answers "
-                    "(never placeholders like 'Option A'); for every other type "
-                    "leave options as an empty array.\n"
+                    "(a 1-5 scale), number, email, and distribution (the "
+                    "respondent splits 100 points across the options). Use a good "
+                    "mix of types rather than leaning on just one.\n"
+                    "For single_choice, multi_choice, and distribution, fill "
+                    "options with at least two real, concise, topic-relevant "
+                    "candidate answers (never placeholders like 'Option A'); for "
+                    "every other type leave options as an empty array.\n"
                     f"Return exactly {count} questions. Reply ONLY with JSON of "
                     'this exact shape:\n'
                     '{"suggestions": [{"text": string, "type": "text"|'
-                    '"single_choice"|"multi_choice"|"rating"|"number"|"email", '
-                    '"options": string[], "required": boolean}]}'
+                    '"single_choice"|"multi_choice"|"rating"|"number"|"email"|'
+                    '"distribution", "options": string[], "required": boolean}]}'
                 ),
             },
             {
@@ -202,8 +208,8 @@ def suggest_questions(topic: str, count: int) -> list[dict]:
             if isinstance(raw_options, list)
             else []
         )
-        if question_type in ("single_choice", "multi_choice"):
-            # A choice question with too few options is meaningless → make it text.
+        if question_type in ("single_choice", "multi_choice", "distribution"):
+            # A choice/distribution question with too few options is meaningless → text.
             if len(options) < 2:
                 question_type = "text"
                 options = []

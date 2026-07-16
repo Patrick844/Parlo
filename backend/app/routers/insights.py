@@ -15,7 +15,7 @@ from .. import llm
 from ..auth import require_admin
 from ..database import get_db
 from ..models import Answer, Form, Session
-from ..schemas import DayCount, InsightsOut, QuestionInsight, SummaryOut
+from ..schemas import DayCount, InsightsOut, OptionAverage, QuestionInsight, SummaryOut
 
 router = APIRouter(prefix="/admin", tags=["insights"], dependencies=[Depends(require_admin)])
 
@@ -82,6 +82,25 @@ def insights(form_id: str, db: DbSession = Depends(get_db)) -> InsightsOut:
                 counts[key] = counts.get(key, 0) + 1
             insight.counts = counts
             insight.average = round(sum(numbers) / len(numbers), 2) if numbers else None
+
+        elif question.type == "distribution":
+            # Mean points allocated to each option across all answers for this
+            # question (an answer omitting an option counts it as 0).
+            options = [str(option) for option in question.options or []]
+            totals = {option: 0.0 for option in options}
+            for answer in q_answers:
+                if not isinstance(answer.value, dict):
+                    continue
+                for option in options:
+                    try:
+                        totals[option] += float(answer.value.get(option, 0) or 0)
+                    except (TypeError, ValueError):
+                        continue
+            n = len(q_answers)
+            insight.distribution = [
+                OptionAverage(option=option, avg=round(totals[option] / n, 2) if n else 0.0)
+                for option in options
+            ]
 
         else:  # text / email → just list the values
             insight.values = [str(a.value) for a in q_answers]
