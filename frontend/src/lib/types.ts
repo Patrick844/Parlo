@@ -107,6 +107,7 @@ export interface DayCount {
 export interface Insights {
   form_id: string;
   title: string;
+  is_open: boolean;
   sessions_started: number;
   sessions_completed: number;
   completion_rate: number;

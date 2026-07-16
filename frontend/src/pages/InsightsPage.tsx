@@ -165,14 +165,25 @@ export default function InsightsPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* AI insights */}
+      {/* AI insights — only on a CLOSED collection, so it runs on complete data. */}
       <div className="card mb-6 p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-dim">AI insights</h2>
-          <button className="btn-primary text-xs" onClick={handleSummarize} disabled={summarizing}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium text-dim">✨ AI insights</h2>
+          <button
+            className="btn-primary text-xs"
+            onClick={handleSummarize}
+            disabled={summarizing || data.is_open}
+            title={data.is_open ? "Close the collection to answers first" : ""}
+          >
             {summarizing ? "Reading the answers…" : summary ? "Refresh" : "Generate insights"}
           </button>
         </div>
+        {data.is_open && (
+          <p className="mt-3 text-xs text-dim">
+            🔒 Close the collection (from the builder) to generate AI insights on the
+            complete set of answers.
+          </p>
+        )}
         {summary && (
           <div className="mt-4">
             {summary.sentiment && (

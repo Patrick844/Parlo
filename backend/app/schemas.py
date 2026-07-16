@@ -224,6 +224,7 @@ class DayCount(BaseModel):
 class InsightsOut(BaseModel):
     form_id: str
     title: str
+    is_open: bool
     sessions_started: int
     sessions_completed: int
     completion_rate: float

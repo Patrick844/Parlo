@@ -118,6 +118,7 @@ def insights(
     return InsightsOut(
         form_id=form.id,
         title=form.title,
+        is_open=form.is_open,
         sessions_started=started,
         sessions_completed=finished,
         completion_rate=(finished / started) if started else 0.0,
@@ -183,6 +184,13 @@ def summarize(
     db: DbSession = Depends(get_db),
 ) -> SummaryOut:
     form = _load_form(db, form_id, current_user)
+    # AI insights run on COMPLETE data only: the collection must be closed first.
+    # (The charts stay viewable live; this just gates the paid summary call.)
+    if form.is_open:
+        raise HTTPException(
+            status_code=409,
+            detail="Close the collection to answers first, then generate AI insights on the complete data.",
+        )
     answers = _form_answers(db, form.id)
     if not answers:
         return SummaryOut(bullets=["No answers collected yet."], sentiment="neutral")
