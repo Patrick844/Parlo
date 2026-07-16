@@ -31,8 +31,8 @@ jobs:
           # the browser and the API share one origin (no CORS gymnastics).
           {
             echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
-            echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}"
             echo "SECRET_KEY=${{ secrets.SECRET_KEY }}"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}"
             echo "VITE_API_BASE=https://forms.patricksaade.dev"
             echo "FRONTEND_URL=https://forms.patricksaade.dev"
           } > .env

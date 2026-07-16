@@ -21,9 +21,9 @@ services:
     ports:
       - "8200:8000"
     environment:
-      DATABASE_URL: postgresql://parlo:parlo@db:5432/parlo
+      # Prod sets DATABASE_URL to the managed Neon URL; local dev falls back to the db container.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://parlo:parlo@db:5432/parlo}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       SECRET_KEY: ${SECRET_KEY}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3200}
     depends_on:
