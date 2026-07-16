@@ -40,7 +40,7 @@ def validate_answer(question: Question, value: object) -> ValidationResult:
     if question.type == "email":
         if isinstance(value, str) and EMAIL_RE.match(value.strip()):
             return True, value.strip().lower(), ""
-        return _fail("Hmm, that doesn't look like a valid email address — mind double-checking it?")
+        return _fail("Hmm, that doesn't look like an email — something like name@example.com?")
 
     if question.type == "rating":
         # A whole number on the creator's configured scale (defaults 1..5).
@@ -60,7 +60,7 @@ def validate_answer(question: Question, value: object) -> ValidationResult:
         try:
             number = float(value)  # type: ignore[arg-type]
         except (TypeError, ValueError):
-            return _fail("A number would be ideal here — could you try again?")
+            return _fail("Just a number works here — like 5. Could you try again?")
         # Optional allowed range.
         low = _config_int(question, "min_value")
         high = _config_int(question, "max_value")

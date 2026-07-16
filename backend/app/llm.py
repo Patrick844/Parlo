@@ -280,8 +280,11 @@ def extract_answer(question: Question, user_text: str) -> dict:
                         'question means rather than answering>}\n'
                         f"For THIS question the value must be {shape}. "
                         + (f"Allowed options: {json.dumps(options)}. " if options else "")
-                        + "If the reply doesn't contain a usable answer, set value to "
-                        "null. Never invent an answer."
+                        + "Extract the value even when it's phrased conversationally: "
+                        "'around ten' or 'ten' -> 10, 'the first one' or 'yeah the "
+                        "salary one' -> the matching option, 'maybe 3 or 4' -> pick the "
+                        "number they lean to. Only set value to null when there is "
+                        "genuinely no answer in the reply. Never invent an answer."
                     ),
                 },
                 {

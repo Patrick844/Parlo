@@ -203,6 +203,17 @@ export default function Chat() {
   // when no min is configured).
   const belowMin = minLen !== undefined && draft.trim().length < minLen;
 
+  // The single input adapts its hint to the current question type.
+  const placeholder = (() => {
+    if (current?.type === "number") {
+      const { min_value: lo, max_value: hi } = current.config;
+      if (Number.isFinite(lo) && Number.isFinite(hi)) return `A number from ${lo} to ${hi}…`;
+      return "Type a number, e.g. 5…";
+    }
+    if (current?.type === "email") return "you@example.com";
+    return "Type an answer, or 'help'…";
+  })();
+
   const questionList = (
     <QuestionList
       total={progress?.total ?? form.question_count}
@@ -279,7 +290,7 @@ export default function Chat() {
               <input
                 ref={inputRef}
                 className="input flex-1"
-                placeholder="Type an answer, or 'help'…"
+                placeholder={placeholder}
                 value={draft}
                 maxLength={maxLen}
                 onChange={(e) => setDraft(e.target.value)}
@@ -516,6 +527,10 @@ function AnswerWidget({
   onSubmit: (message: string, bubble: string) => void;
   disabled: boolean;
 }) {
+  // Only types where TAPPING beats typing get a widget (buttons / allocator).
+  // number, email and text are typed straight into the single chat bar below —
+  // avoids two stacked inputs, and the backend extracts natural language
+  // ("around 10", "ten") into the right value.
   switch (question.type) {
     case "single_choice":
       return <SingleChoice question={question} onSubmit={onSubmit} disabled={disabled} />;
@@ -525,12 +540,8 @@ function AnswerWidget({
       return <Rating question={question} onSubmit={onSubmit} disabled={disabled} />;
     case "distribution":
       return <Distribution question={question} onSubmit={onSubmit} disabled={disabled} />;
-    case "number":
-      return <ScalarInput kind="number" question={question} onSubmit={onSubmit} disabled={disabled} />;
-    case "email":
-      return <ScalarInput kind="email" question={question} onSubmit={onSubmit} disabled={disabled} />;
     default:
-      return null; // `text` uses the always-present free-text input below
+      return null; // text / number / email use the always-present free-text input
   }
 }
 
@@ -658,89 +669,6 @@ function Rating({
           {n}
         </button>
       ))}
-    </div>
-  );
-}
-
-function ScalarInput({
-  kind,
-  question,
-  onSubmit,
-  disabled,
-}: {
-  kind: "number" | "email";
-  question: CurrentQuestion;
-  onSubmit: (m: string, b: string) => void;
-  disabled: boolean;
-}) {
-  const [value, setValue] = useState("");
-  const [error, setError] = useState("");
-
-  // Optional allowed range for number questions.
-  const min =
-    kind === "number" && Number.isFinite(question.config.min_value)
-      ? question.config.min_value
-      : undefined;
-  const max =
-    kind === "number" && Number.isFinite(question.config.max_value)
-      ? question.config.max_value
-      : undefined;
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    const v = value.trim();
-    if (!v) return;
-    if (kind === "number") {
-      const n = Number(v);
-      if (!Number.isFinite(n)) {
-        setError("Please enter a number.");
-        return;
-      }
-      if (min !== undefined && n < min) {
-        setError(`Please enter a number that's at least ${min}.`);
-        return;
-      }
-      if (max !== undefined && n > max) {
-        setError(`Please enter a number no greater than ${max}.`);
-        return;
-      }
-    }
-    setError("");
-    onSubmit(v, v);
-    setValue("");
-  }
-
-  const range =
-    min !== undefined && max !== undefined
-      ? `${min}–${max}`
-      : min !== undefined
-        ? `min ${min}`
-        : max !== undefined
-          ? `max ${max}`
-          : "Enter a number";
-
-  return (
-    <div className="space-y-1.5">
-      <form onSubmit={submit} className="flex gap-2">
-        <input
-          className="input flex-1"
-          type={kind === "number" ? "number" : "email"}
-          inputMode={kind === "number" ? "decimal" : "email"}
-          min={min}
-          max={max}
-          placeholder={kind === "number" ? range : "you@example.com"}
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            if (error) setError("");
-          }}
-          disabled={disabled}
-        />
-        <button className="btn-primary" disabled={disabled || !value.trim()}>
-          Submit
-        </button>
-      </form>
-      {error && <p className="text-xs text-coral-deep">{error}</p>}
     </div>
   );
 }
