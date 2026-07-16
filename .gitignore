@@ -1,0 +1,12 @@
+# deps & builds
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+# env & secrets
+.env
+.env.*
+!.env.example
+# os
+.DS_Store

@@ -1,0 +1,105 @@
+"""Database tables.
+
+The shape of the app in four tables:
+  Form      — a "conversation" a creator builds and shares.
+  Question  — one item inside a form (ordered by `position`).
+  Session   — one respondent's run through a form (their chat transcript).
+  Answer    — one validated answer, linked to both a session and a question.
+"""
+
+import secrets
+import string
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .database import Base
+
+
+def new_id() -> str:
+    """UUIDs stored as strings so they work on any database."""
+    return str(uuid.uuid4())
+
+
+def new_slug() -> str:
+    """Short random slug for public links, e.g. /f/x7Kp2mQa."""
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class Form(Base):
+    __tablename__ = "forms"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    slug: Mapped[str] = mapped_column(String(16), unique=True, index=True, default=new_slug)
+    is_open: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    questions: Mapped[list["Question"]] = relationship(
+        back_populates="form",
+        order_by="Question.position",
+        cascade="all, delete-orphan",
+    )
+    sessions: Mapped[list["Session"]] = relationship(
+        back_populates="form", cascade="all, delete-orphan"
+    )
+
+
+class Question(Base):
+    __tablename__ = "questions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    form_id: Mapped[str] = mapped_column(ForeignKey("forms.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    text: Mapped[str] = mapped_column(Text)
+    # One of: text, single_choice, multi_choice, rating, number, email.
+    type: Mapped[str] = mapped_column(String(20), default="text")
+    # Only used by the choice types; a JSON array of option strings.
+    options: Mapped[list] = mapped_column(JSON, default=list)
+    required: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    form: Mapped[Form] = relationship(back_populates="questions")
+
+
+class Session(Base):
+    """One respondent's chat. `history` holds the full message transcript."""
+
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    form_id: Mapped[str] = mapped_column(ForeignKey("forms.id", ondelete="CASCADE"), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # A list of {"role": "user"|"assistant", "content": "..."} dicts.
+    history: Mapped[list] = mapped_column(JSON, default=list)
+
+    form: Mapped[Form] = relationship(back_populates="sessions")
+    answers: Mapped[list["Answer"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+
+
+class Answer(Base):
+    __tablename__ = "answers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("sessions.id", ondelete="CASCADE"), index=True
+    )
+    question_id: Mapped[str] = mapped_column(
+        ForeignKey("questions.id", ondelete="CASCADE"), index=True
+    )
+    # JSON so one column fits every question type (string, number, or array).
+    value: Mapped[object] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    session: Mapped[Session] = relationship(back_populates="answers")
+    question: Mapped[Question] = relationship()
