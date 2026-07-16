@@ -47,7 +47,7 @@ export default function Login() {
             🧪 This is a demo for testing — your data may be cleared from time to
             time.
           </p>
-          <p className="mt-1">Up to 15 collections and 25 AI generations per day.</p>
+          <p className="mt-1">1 collection and up to 25 AI generations per day.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

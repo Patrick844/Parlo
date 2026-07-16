@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 # --- limits (also surfaced to the frontend via /api/auth/me) ---
-MAX_COLLECTIONS_PER_USER = 15
+MAX_COLLECTIONS_PER_USER = 1
 MAX_AI_GENERATIONS_PER_DAY = 25
 ENTER_RATE_LIMIT_PER_HOUR = 15
 
