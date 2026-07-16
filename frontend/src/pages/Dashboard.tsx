@@ -83,7 +83,7 @@ export default function Dashboard() {
               <div className="min-w-0 flex-1">
                 <Link
                   to={`/forms/${item.id}/edit`}
-                  className="font-medium hover:text-mint"
+                  className="font-medium hover:text-iris"
                 >
                   {item.title}
                 </Link>
@@ -97,7 +97,7 @@ export default function Dashboard() {
               </div>
 
               <span
-                className={`tag ${item.is_open ? "text-mint border-mint/40" : ""}`}
+                className={`tag ${item.is_open ? "text-iris border-iris/40" : ""}`}
               >
                 {item.is_open ? "Open" : "Closed"}
               </span>

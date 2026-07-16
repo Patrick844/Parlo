@@ -1,7 +1,7 @@
 /** Insights: stat cards, charts, text answers, AI summary, CSV export.
  *
  * Chart conventions (kept consistent across every chart):
- * - one hue per chart (emerald for bars, violet for the trend line)
+ * - one hue per chart (violet bars, fuchsia trend line) — matches Parlo's palette
  * - recessive grid/axes in border/dim tokens, values in text tokens
  * - thin marks with rounded data-ends, tooltips on hover
  */
@@ -26,8 +26,8 @@ import { downloadCsv, getInsights, summarize } from "../lib/api";
 import type { Insights, QuestionInsight, Summary } from "../lib/types";
 
 // Validated on the #0e1116 surface with the palette checker.
-const BAR_COLOR = "#059669"; // emerald — categorical/magnitude bars
-const LINE_COLOR = "#8b5cf6"; // violet — the time-series line
+const BAR_COLOR = "#7c3aed"; // iris (violet) — categorical/magnitude bars
+const LINE_COLOR = "#e879f9"; // glow (fuchsia) — the time-series line
 const GRID_COLOR = "#28303c";
 const AXIS_COLOR = "#98a2b3";
 
@@ -155,14 +155,14 @@ export default function InsightsPage() {
         {summary && (
           <div className="mt-4">
             {summary.sentiment && (
-              <span className="tag mb-3 capitalize text-mint border-mint/40">
+              <span className="tag mb-3 capitalize text-iris border-iris/40">
                 Overall sentiment: {summary.sentiment}
               </span>
             )}
             <ul className="mt-2 space-y-2">
               {summary.bullets.map((bullet, i) => (
                 <li key={i} className="flex gap-2 text-sm">
-                  <span className="text-mint">•</span>
+                  <span className="text-iris">•</span>
                   <span>{bullet}</span>
                 </li>
               ))}

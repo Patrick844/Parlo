@@ -8,7 +8,7 @@
     @apply bg-ink text-fog font-sans antialiased;
   }
   ::selection {
-    @apply bg-mint/30;
+    @apply bg-iris/30;
   }
 }
 
@@ -21,7 +21,7 @@
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-mint text-ink hover:bg-mint-deep hover:text-fog;
+    @apply btn bg-iris text-ink hover:bg-iris-deep hover:text-fog;
   }
   .btn-ghost {
     @apply btn border border-edge text-dim hover:text-fog hover:border-dim;
@@ -30,7 +30,7 @@
     @apply btn border border-edge text-dim hover:text-red-400 hover:border-red-400/50;
   }
   .input {
-    @apply w-full rounded-xl bg-surface border border-edge px-3 py-2 text-sm text-fog placeholder-dim/60 outline-none focus:border-mint/60;
+    @apply w-full rounded-xl bg-surface border border-edge px-3 py-2 text-sm text-fog placeholder-dim/60 outline-none focus:border-iris/60;
   }
   .label {
     @apply block text-xs font-medium uppercase tracking-wider text-dim mb-1.5;

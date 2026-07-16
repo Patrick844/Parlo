@@ -1,0 +1,79 @@
+name: Deploy Parlo to EC2
+
+# Runs on every push to main (and can be triggered by hand from the Actions tab).
+# It installs Docker on the server if missing, writes the .env from GitHub secrets,
+# syncs the code, and (re)builds + restarts the whole stack — db + backend + frontend.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys run at the same time.
+concurrency:
+  group: deploy-parlo
+  cancel-in-progress: false
+
+env:
+  DEPLOY_DIR: /home/ubuntu/parlo
+  HOST: ubuntu@${{ secrets.EC2_HOST }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate .env from secrets
+        run: |
+          # One .env at the repo root; docker-compose reads it for ${VARS}.
+          # VITE_API_BASE + FRONTEND_URL are the PUBLIC https origin — Parlo runs
+          # on a single subdomain and Caddy path-routes /api/* to the backend, so
+          # the browser and the API share one origin (no CORS gymnastics).
+          {
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
+            echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}"
+            echo "SECRET_KEY=${{ secrets.SECRET_KEY }}"
+            echo "VITE_API_BASE=https://forms.patricksaade.dev"
+            echo "FRONTEND_URL=https://forms.patricksaade.dev"
+          } > .env
+
+      - name: Configure SSH
+        run: |
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+      - name: Bootstrap server (Docker + rsync, idempotent)
+        run: |
+          ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=accept-new "$HOST" '
+            set -e
+            if ! command -v docker >/dev/null 2>&1; then
+              curl -fsSL https://get.docker.com | sudo sh
+            fi
+            command -v rsync >/dev/null 2>&1 || (sudo apt-get update -y && sudo apt-get install -y rsync)
+            sudo systemctl enable --now docker
+          '
+
+      - name: Sync code to server
+        run: |
+          # --delete keeps the server tree identical to git. Exclude local-only
+          # junk and, crucially, the .env (we regenerate it from secrets, above,
+          # and rsync it explicitly so server secrets are never clobbered by stale files).
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude "dist" \
+            --exclude "__pycache__" \
+            --exclude "*.pem" \
+            -e "ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            ./ "$HOST:$DEPLOY_DIR/"
+
+      - name: Build and start the stack
+        run: |
+          ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=accept-new "$HOST" "
+            set -e
+            cd $DEPLOY_DIR
+            sudo docker compose up -d --build
+            sudo docker image prune -f
+            sudo docker compose ps
+          "

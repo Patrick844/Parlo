@@ -3,16 +3,17 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      // Parlo palette — dark-first: charcoal surfaces, mint accent, violet secondary.
+      // Parlo palette — dark-first, VIOLET-forward. Iris (violet) is the signature
+      // accent; glow (fuchsia) is the secondary pop. Surfaces are violet-tinted charcoal.
       colors: {
-        ink: "#0e1116", // page background
-        surface: "#151a21", // raised panels
-        card: "#1a202a", // cards / chat bubbles
-        edge: "#28303c", // borders
-        fog: "#e8ecf1", // primary text
-        dim: "#98a2b3", // secondary text
-        mint: { DEFAULT: "#34d399", deep: "#059669" },
-        violet: { DEFAULT: "#a78bfa", deep: "#8b5cf6" },
+        ink: "#0f0d17", // page background
+        surface: "#171525", // raised panels
+        card: "#1d1a2e", // cards / chat bubbles
+        edge: "#312c45", // borders
+        fog: "#ece9f5", // primary text
+        dim: "#a29db8", // secondary text
+        iris: { DEFAULT: "#a78bfa", deep: "#7c3aed" }, // primary accent (violet)
+        glow: { DEFAULT: "#e879f9", deep: "#c026d3" }, // secondary accent (fuchsia)
       },
       fontFamily: {
         sans: [
