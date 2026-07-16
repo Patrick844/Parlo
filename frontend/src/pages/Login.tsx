@@ -38,7 +38,7 @@ export default function Login() {
           <Logo size="text-4xl" />
         </div>
         <p className="mb-6 text-center text-sm text-dim">
-          👋 Ask anything. Just talk.
+          👋 Collecting answers, one chat at a time.
         </p>
 
         {/* Friendly, light demo note. */}
