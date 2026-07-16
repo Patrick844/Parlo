@@ -32,6 +32,9 @@ class QuestionCreate(BaseModel):
     type: QuestionType = "text"
     options: list[str] = []
     required: bool = True
+    # Per-type answer settings (see models.Question.config). Kept a permissive
+    # dict on purpose — the server sanitizes/clamps it, not pydantic.
+    config: dict = {}
 
 
 class QuestionUpdate(BaseModel):
@@ -40,6 +43,7 @@ class QuestionUpdate(BaseModel):
     options: Optional[list[str]] = None
     required: Optional[bool] = None
     position: Optional[int] = None
+    config: Optional[dict] = None
 
 
 class QuestionOut(BaseModel):
@@ -51,6 +55,7 @@ class QuestionOut(BaseModel):
     type: QuestionType
     options: list[str]
     required: bool
+    config: dict = {}
 
 
 class ReorderRequest(BaseModel):
@@ -155,6 +160,8 @@ class CurrentQuestion(BaseModel):
     type: QuestionType
     options: list[str] = []
     required: bool
+    # Per-type answer settings so the widget can render the right range/limits.
+    config: dict = {}
     position: int  # 1-based, for display ("Question 3 of 5")
     total: int
 

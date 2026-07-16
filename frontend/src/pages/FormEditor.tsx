@@ -13,13 +13,19 @@ import {
   updateForm,
   updateQuestion,
 } from "../lib/api";
-import type { Form, Question, QuestionType, SuggestedQuestion } from "../lib/types";
+import type {
+  Form,
+  Question,
+  QuestionConfig,
+  QuestionType,
+  SuggestedQuestion,
+} from "../lib/types";
 
 const TYPE_LABELS: Record<QuestionType, string> = {
   text: "Free text",
   single_choice: "Single choice",
   multi_choice: "Multiple choice",
-  rating: "Rating (1–5)",
+  rating: "Rating",
   number: "Number",
   email: "Email",
   distribution: "Distribution (allocate 100)",
@@ -284,6 +290,7 @@ function AddQuestionsModal({
           type: draft.type,
           options: draft.options,
           required: draft.required,
+          config: {},
         });
       }
       await onAdded();
@@ -518,6 +525,105 @@ function AddQuestionsModal({
   );
 }
 
+/** Per-question answer settings, shown only for the types that have any.
+ *  Values are held as raw strings while editing and committed (parsed to ints,
+ *  blanks dropped) on blur so the creator can clear a field to "no limit". */
+function QuestionSettings({
+  question,
+  onSave,
+}: {
+  question: Question;
+  onSave: (changes: { config: QuestionConfig }) => Promise<void>;
+}) {
+  const [fields, setFields] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      Object.entries(question.config ?? {}).map(([k, v]) => [k, String(v)]),
+    ),
+  );
+
+  const setField = (key: string, value: string) =>
+    setFields((prev) => ({ ...prev, [key]: value }));
+
+  /** Parse the given keys into a fresh config and persist it. Blank = omit. */
+  function commit(keys: string[]) {
+    const config: QuestionConfig = {};
+    for (const key of keys) {
+      const raw = (fields[key] ?? "").trim();
+      if (raw === "") continue;
+      const n = Number(raw);
+      if (Number.isFinite(n)) config[key] = Math.trunc(n);
+    }
+    void onSave({ config });
+  }
+
+  function num(key: string, keys: string[], placeholder: string) {
+    return (
+      <input
+        className="input w-24"
+        type="number"
+        value={fields[key] ?? ""}
+        placeholder={placeholder}
+        onChange={(e) => setField(key, e.target.value)}
+        onBlur={() => commit(keys)}
+      />
+    );
+  }
+
+  let body: React.ReactNode = null;
+  if (question.type === "rating") {
+    const keys = ["min_value", "max_value"];
+    body = (
+      <div className="flex flex-wrap items-center gap-2 text-sm text-dim">
+        <span>Scale from</span>
+        {num("min_value", keys, "1")}
+        <span>to</span>
+        {num("max_value", keys, "5")}
+      </div>
+    );
+  } else if (question.type === "text") {
+    const keys = ["min_length", "max_length"];
+    body = (
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm text-dim">
+          Min characters {num("min_length", keys, "none")}
+        </label>
+        <label className="flex items-center gap-2 text-sm text-dim">
+          Max characters {num("max_length", keys, "none")}
+        </label>
+      </div>
+    );
+  } else if (question.type === "number") {
+    const keys = ["min_value", "max_value"];
+    body = (
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm text-dim">
+          Min value {num("min_value", keys, "none")}
+        </label>
+        <label className="flex items-center gap-2 text-sm text-dim">
+          Max value {num("max_value", keys, "none")}
+        </label>
+      </div>
+    );
+  } else if (question.type === "multi_choice") {
+    body = (
+      <label className="flex items-center gap-2 text-sm text-dim">
+        Max selections {num("max_choices", ["max_choices"], "any")}
+      </label>
+    );
+  }
+
+  if (!body) return null;
+
+  return (
+    <div className="rounded-2xl border border-edge bg-surface/50 p-3">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-dim">
+        Settings
+      </div>
+      {body}
+    </div>
+  );
+}
+
 /** One editable question card. Fields save on blur / change. */
 function QuestionEditor({
   question,
@@ -613,13 +719,12 @@ function QuestionEditor({
               Required
             </label>
 
-            {question.type === "rating" && (
-              <span className="tag">Scale is always 1–5</span>
-            )}
             {question.type === "distribution" && (
               <span className="tag">Respondents split 100 across these</span>
             )}
           </div>
+
+          <QuestionSettings question={question} onSave={save} />
 
           {hasOptions && (
             <div>

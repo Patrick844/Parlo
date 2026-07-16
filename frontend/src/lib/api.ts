@@ -7,6 +7,7 @@ import type {
   Insights,
   PublicForm,
   Question,
+  QuestionConfig,
   QuestionType,
   SuggestQuestionsResponse,
   Summary,
@@ -121,6 +122,7 @@ export interface QuestionDraft {
   type: QuestionType;
   options: string[];
   required: boolean;
+  config: QuestionConfig;
 }
 
 export const addQuestion = (formId: string, draft: QuestionDraft) =>

@@ -9,6 +9,11 @@ export type QuestionType =
   | "email"
   | "distribution";
 
+/** Per-type answer settings. Which keys apply depends on the question type:
+ *  rating → min_value/max_value, text → min_length/max_length,
+ *  number → min_value/max_value, multi_choice → max_choices. */
+export type QuestionConfig = Record<string, number>;
+
 export interface Question {
   id: string;
   position: number;
@@ -16,6 +21,7 @@ export interface Question {
   type: QuestionType;
   options: string[];
   required: boolean;
+  config: QuestionConfig;
 }
 
 export interface Form {
@@ -58,6 +64,7 @@ export interface CurrentQuestion {
   type: QuestionType;
   options: string[];
   required: boolean;
+  config: QuestionConfig;
   position: number; // 1-based
   total: number;
 }

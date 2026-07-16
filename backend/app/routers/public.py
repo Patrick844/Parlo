@@ -229,6 +229,7 @@ def _question_out(questions: list[Question], question: Question) -> CurrentQuest
         type=question.type,
         options=list(question.options or []),
         required=question.required,
+        config=dict(question.config or {}),
         position=_position_of(questions, question),
         total=len(questions),
     )

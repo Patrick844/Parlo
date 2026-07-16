@@ -137,6 +137,7 @@ def add_question(
         type=body.type,
         options=body.options,
         required=body.required,
+        config=_sanitize_config(body.type, body.config),
     )
     db.add(question)
     db.commit()
@@ -155,6 +156,11 @@ def update_question(
     new_type = changes.get("type", question.type)
     new_options = changes.get("options", question.options)
     _check_options(new_type, new_options)
+    # Re-sanitize config against the effective type. If the type changed but no
+    # new config was sent, re-filter the existing one so stale keys are dropped.
+    if "config" in changes or "type" in changes:
+        raw_config = changes.get("config", question.config or {})
+        changes["config"] = _sanitize_config(new_type, raw_config or {})
     for field, value in changes.items():
         setattr(question, field, value)
     db.commit()
@@ -217,6 +223,57 @@ def suggest_questions(
 
     suggestions = [SuggestedQuestion(**draft) for draft in drafts]
     return SuggestQuestionsResponse(count=effective, suggestions=suggestions)
+
+
+# Which config keys are meaningful for each question type. Anything else the
+# client sends is dropped so a question never carries settings it can't use.
+_CONFIG_KEYS: dict[str, tuple[str, ...]] = {
+    "rating": ("min_value", "max_value"),
+    "text": ("min_length", "max_length"),
+    "number": ("min_value", "max_value"),
+    "multi_choice": ("max_choices",),
+}
+
+
+def _coerce_int(value: object) -> int | None:
+    """Best-effort int coercion; returns None for anything non-numeric."""
+    if isinstance(value, bool):  # bool is an int subclass — reject it explicitly
+        return None
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _sanitize_config(question_type: str, raw: dict) -> dict:
+    """Keep only the keys relevant to `question_type`, coerce them to ints, and
+    drop nonsense. min>max pairs are swapped so the stored range is always sane.
+    Returns a clean dict (possibly empty) safe to persist and to validate against."""
+    allowed = _CONFIG_KEYS.get(question_type, ())
+    if not allowed or not isinstance(raw, dict):
+        return {}
+
+    clean: dict = {}
+    for key in allowed:
+        coerced = _coerce_int(raw.get(key))
+        if coerced is not None:
+            clean[key] = coerced
+
+    # Normalize the min/max pairs so a swapped range never gets stored.
+    for lo, hi in (("min_value", "max_value"), ("min_length", "max_length")):
+        if lo in clean and hi in clean and clean[lo] > clean[hi]:
+            clean[lo], clean[hi] = clean[hi], clean[lo]
+
+    # Lengths and choice counts can't be negative; a min_length of 0 == no min.
+    for key in ("min_length", "max_length", "max_choices"):
+        if key in clean and clean[key] < 0:
+            del clean[key]
+    if clean.get("min_length") == 0:
+        del clean["min_length"]
+    if question_type == "multi_choice" and clean.get("max_choices") == 0:
+        del clean["max_choices"]
+
+    return clean
 
 
 def _check_options(question_type: str, options: list) -> None:

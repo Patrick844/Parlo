@@ -67,6 +67,11 @@ class Question(Base):
     # Only used by the choice types; a JSON array of option strings.
     options: Mapped[list] = mapped_column(JSON, default=list)
     required: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Per-type answer settings, e.g. {"min_value": 1, "max_value": 10} for a
+    # rating, {"min_length": 2, "max_length": 200} for text, {"max_choices": 3}
+    # for multi_choice. Only the keys relevant to `type` are kept (sanitized in
+    # forms_admin.py). Empty dict means "use the defaults / no limits".
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
 
     form: Mapped[Form] = relationship(back_populates="questions")
 

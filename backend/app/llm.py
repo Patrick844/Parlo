@@ -50,12 +50,44 @@ def _answer_hint(question: Question) -> str:
             return f"They pick one or more of: {opts}."
         return f"They split 100 points across: {opts}."
     if t == "rating":
-        return "They give a whole number from 1 to 5."
+        low, high = _rating_range(question)
+        return f"They give a whole number from {low} to {high}."
     if t == "number":
+        low, high = _number_range(question)
+        if low is not None and high is not None:
+            return f"They give a number from {low} to {high}."
+        if low is not None:
+            return f"They give a number that's at least {low}."
+        if high is not None:
+            return f"They give a number no greater than {high}."
         return "They give a number."
     if t == "email":
         return "They give an email address."
     return "They answer in their own words."
+
+
+def _config_int(question: Question, key: str, default: int | None = None) -> int | None:
+    """Read one integer setting from the question's config (sanitized on write)."""
+    config = getattr(question, "config", None) or {}
+    value = config.get(key)
+    if isinstance(value, bool) or value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _rating_range(question: Question) -> tuple[int, int]:
+    """The rating scale for phrasing/parsing — defaults to 1..5."""
+    low = _config_int(question, "min_value", 1) or 1
+    high = _config_int(question, "max_value", 5) or 5
+    return (low, high) if low <= high else (high, low)
+
+
+def _number_range(question: Question) -> tuple[int | None, int | None]:
+    """The optional allowed number range (either bound may be None)."""
+    return _config_int(question, "min_value"), _config_int(question, "max_value")
 
 
 def compose_intro(title: str, description: str, total: int) -> str:
@@ -184,11 +216,21 @@ def extract_answer(question: Question, user_text: str) -> dict:
     """
     empty = {"value": None, "declined": False, "needs_help": False}
     options = question.options or []
+    low, high = _rating_range(question)
+    num_low, num_high = _number_range(question)
+    if num_low is not None and num_high is not None:
+        number_shape = f"a number from {num_low} to {num_high}"
+    elif num_low is not None:
+        number_shape = f"a number that is at least {num_low}"
+    elif num_high is not None:
+        number_shape = f"a number no greater than {num_high}"
+    else:
+        number_shape = "a number"
     shape = {
         "single_choice": "exactly one option string from the list",
         "multi_choice": "an array of option strings from the list",
-        "rating": "an integer from 1 to 5",
-        "number": "a number",
+        "rating": f"an integer from {low} to {high}",
+        "number": number_shape,
         "email": "the email address as a string",
         "distribution": (
             "an object mapping each option string to its points (all points "

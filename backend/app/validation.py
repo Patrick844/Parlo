@@ -23,9 +23,19 @@ def validate_answer(question: Question, value: object) -> ValidationResult:
     """Check `value` against the question's type. Never trust the LLM blindly."""
 
     if question.type == "text":
-        if isinstance(value, str) and value.strip():
-            return True, value.strip(), ""
-        return _fail("Could you share a few words on that?")
+        if not (isinstance(value, str) and value.strip()):
+            return _fail("Could you share a few words on that?")
+        cleaned = value.strip()
+        # Character limits are optional. When no min is set, ANY non-empty
+        # answer is accepted — a short reply is never rejected.
+        min_length = _config_int(question, "min_length")
+        max_length = _config_int(question, "max_length")
+        if min_length is not None and len(cleaned) < min_length:
+            plural = "character" if min_length == 1 else "characters"
+            return _fail(f"Please use at least {min_length} {plural}.")
+        if max_length is not None and len(cleaned) > max_length:
+            return _fail(f"Please keep it under {max_length} characters.")
+        return True, cleaned, ""
 
     if question.type == "email":
         if isinstance(value, str) and EMAIL_RE.match(value.strip()):
@@ -33,20 +43,31 @@ def validate_answer(question: Question, value: object) -> ValidationResult:
         return _fail("Hmm, that doesn't look like a valid email address — mind double-checking it?")
 
     if question.type == "rating":
-        # Accept "4" or 4.0 as long as it lands on a whole number 1–5.
+        # A whole number on the creator's configured scale (defaults 1..5).
+        low = _config_int(question, "min_value", 1)
+        high = _config_int(question, "max_value", 5)
+        if low > high:
+            low, high = high, low
         try:
             number = float(value)  # type: ignore[arg-type]
         except (TypeError, ValueError):
-            return _fail("Could you give me a number from 1 to 5?")
-        if number.is_integer() and 1 <= int(number) <= 5:
+            return _fail(f"Please pick a number from {low} to {high}.")
+        if number.is_integer() and low <= int(number) <= high:
             return True, int(number), ""
-        return _fail("A whole number from 1 to 5 would be perfect — which would you pick?")
+        return _fail(f"Please pick a number from {low} to {high}.")
 
     if question.type == "number":
         try:
             number = float(value)  # type: ignore[arg-type]
         except (TypeError, ValueError):
             return _fail("A number would be ideal here — could you try again?")
+        # Optional allowed range.
+        low = _config_int(question, "min_value")
+        high = _config_int(question, "max_value")
+        if low is not None and number < low:
+            return _fail(f"Please enter a number that's at least {low}.")
+        if high is not None and number > high:
+            return _fail(f"Please enter a number no greater than {high}.")
         # Store ints as ints so 7 doesn't become 7.0 in exports.
         return True, int(number) if number.is_integer() else number, ""
 
@@ -73,9 +94,14 @@ def validate_answer(question: Question, value: object) -> ValidationResult:
                 )
             if picked not in picked_list:
                 picked_list.append(picked)
-        if picked_list:
-            return True, picked_list, ""
-        return _fail("Could you pick at least one of: " + ", ".join(options) + "?")
+        if not picked_list:
+            return _fail("Could you pick at least one of: " + ", ".join(options) + "?")
+        # Optional cap on how many options a respondent may choose.
+        max_choices = _config_int(question, "max_choices")
+        if max_choices is not None and len(picked_list) > max_choices:
+            plural = "option" if max_choices == 1 else "options"
+            return _fail(f"Please pick at most {max_choices} {plural}.")
+        return True, picked_list, ""
 
     if question.type == "distribution":
         # A mapping of option → points; every key must be a known option, every
@@ -104,6 +130,20 @@ def validate_answer(question: Question, value: object) -> ValidationResult:
         return True, allocation, ""
 
     return _fail("I didn't quite catch that — could you rephrase?")
+
+
+def _config_int(question: Question, key: str, default: int | None = None) -> int | None:
+    """Read one integer setting from the question's config, or `default` when it
+    is missing or not a whole number. Config is sanitized on write, so this is a
+    light second line of defence for older / hand-edited rows."""
+    config = getattr(question, "config", None) or {}
+    value = config.get(key)
+    if isinstance(value, bool) or value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _match_option(value: object, options: list) -> str | None:

@@ -122,6 +122,11 @@ export default function Chat() {
     event.preventDefault();
     const message = draft.trim();
     if (!message || waiting || done) return;
+    // Respect a text question's minimum length (Enter bypasses the disabled button).
+    if (current?.type === "text") {
+      const min = current.config.min_length;
+      if (Number.isFinite(min) && message.length < min) return;
+    }
     setMessages((all) => [...all, { role: "user", content: message }]);
     setDraft("");
     void callChat({ message, answeringId: current?.id ?? null });
@@ -187,6 +192,15 @@ export default function Chat() {
   }
 
   // ----- the live interview: sidebar + chat -----
+  // Character limits only apply while a `text` question is current; the shared
+  // input is also used for typing choices / "help", so guard on the type.
+  const textCfg = current?.type === "text" ? current.config : undefined;
+  const maxLen = Number.isFinite(textCfg?.max_length) ? textCfg!.max_length : undefined;
+  const minLen = Number.isFinite(textCfg?.min_length) ? textCfg!.min_length : undefined;
+  // Block send only when a min is set and not yet met (never for a short answer
+  // when no min is configured).
+  const belowMin = minLen !== undefined && draft.trim().length < minLen;
+
   const questionList = (
     <QuestionList
       total={progress?.total ?? form.question_count}
@@ -255,6 +269,7 @@ export default function Chat() {
                 className="input flex-1"
                 placeholder="Type an answer, or 'help'…"
                 value={draft}
+                maxLength={maxLen}
                 onChange={(e) => setDraft(e.target.value)}
                 disabled={waiting}
                 aria-label="Your answer"
@@ -268,10 +283,23 @@ export default function Chat() {
               >
                 Help
               </button>
-              <button className="btn-primary" disabled={waiting || !draft.trim()}>
+              <button className="btn-primary" disabled={waiting || !draft.trim() || belowMin}>
                 Send
               </button>
             </form>
+            {/* Character counter / min hint for text questions. */}
+            {(maxLen !== undefined || minLen !== undefined) && (
+              <div className="mt-1.5 flex justify-end gap-3 text-xs text-dim">
+                {minLen !== undefined && belowMin && (
+                  <span className="text-glow">At least {minLen} characters</span>
+                )}
+                {maxLen !== undefined && (
+                  <span>
+                    {draft.length}/{maxLen}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -462,13 +490,13 @@ function AnswerWidget({
     case "multi_choice":
       return <MultiChoice question={question} onSubmit={onSubmit} disabled={disabled} />;
     case "rating":
-      return <Rating onSubmit={onSubmit} disabled={disabled} />;
+      return <Rating question={question} onSubmit={onSubmit} disabled={disabled} />;
     case "distribution":
       return <Distribution question={question} onSubmit={onSubmit} disabled={disabled} />;
     case "number":
-      return <ScalarInput kind="number" onSubmit={onSubmit} disabled={disabled} />;
+      return <ScalarInput kind="number" question={question} onSubmit={onSubmit} disabled={disabled} />;
     case "email":
-      return <ScalarInput kind="email" onSubmit={onSubmit} disabled={disabled} />;
+      return <ScalarInput kind="email" question={question} onSubmit={onSubmit} disabled={disabled} />;
     default:
       return null; // `text` uses the always-present free-text input below
   }
@@ -513,21 +541,31 @@ function MultiChoice({
   disabled: boolean;
 }) {
   const [picked, setPicked] = useState<string[]>([]);
+  // Optional cap on how many options may be selected.
+  const max =
+    Number.isFinite(question.config.max_choices) && question.config.max_choices > 0
+      ? question.config.max_choices
+      : null;
+  const atCap = max != null && picked.length >= max;
   function toggle(opt: string) {
-    setPicked((cur) =>
-      cur.includes(opt) ? cur.filter((o) => o !== opt) : [...cur, opt],
-    );
+    setPicked((cur) => {
+      if (cur.includes(opt)) return cur.filter((o) => o !== opt);
+      if (max != null && cur.length >= max) return cur; // cap reached — ignore
+      return [...cur, opt];
+    });
   }
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         {question.options.map((opt) => {
           const on = picked.includes(opt);
+          // Once the cap is hit, unselected options are disabled (not hidden).
+          const blocked = !on && atCap;
           return (
             <button
               key={opt}
               type="button"
-              disabled={disabled}
+              disabled={disabled || blocked}
               onClick={() => toggle(opt)}
               className={`${chip} ${
                 on
@@ -541,6 +579,12 @@ function MultiChoice({
           );
         })}
       </div>
+      {max != null && (
+        <p className="text-xs text-dim">
+          Pick up to {max}
+          {atCap && <span className="text-glow"> · limit reached</span>}
+        </p>
+      )}
       <button
         type="button"
         className="btn-primary"
@@ -554,21 +598,30 @@ function MultiChoice({
 }
 
 function Rating({
+  question,
   onSubmit,
   disabled,
 }: {
+  question: CurrentQuestion;
   onSubmit: (m: string, b: string) => void;
   disabled: boolean;
 }) {
+  // The creator's configured scale (defaults to 1–5). Guard against a huge or
+  // inverted range so the widget always renders a tidy, finite row of buttons.
+  let low = Number.isFinite(question.config.min_value) ? question.config.min_value : 1;
+  let high = Number.isFinite(question.config.max_value) ? question.config.max_value : 5;
+  if (low > high) [low, high] = [high, low];
+  const count = Math.min(high - low + 1, 100);
+  const scale = Array.from({ length: count }, (_, i) => low + i);
   return (
-    <div className="flex gap-2">
-      {[1, 2, 3, 4, 5].map((n) => (
+    <div className="nice-scroll flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+      {scale.map((n) => (
         <button
           key={n}
           type="button"
           disabled={disabled}
-          onClick={() => onSubmit(String(n), `${n} / 5`)}
-          className={`${chip} h-11 w-11 border-edge bg-card text-base text-fog hover:border-iris/60 hover:bg-iris/10`}
+          onClick={() => onSubmit(String(n), `${n} / ${high}`)}
+          className={`${chip} h-11 min-w-11 border-edge bg-card text-base text-fog hover:border-iris/60 hover:bg-iris/10`}
         >
           {n}
         </button>
@@ -579,36 +632,84 @@ function Rating({
 
 function ScalarInput({
   kind,
+  question,
   onSubmit,
   disabled,
 }: {
   kind: "number" | "email";
+  question: CurrentQuestion;
   onSubmit: (m: string, b: string) => void;
   disabled: boolean;
 }) {
   const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+
+  // Optional allowed range for number questions.
+  const min =
+    kind === "number" && Number.isFinite(question.config.min_value)
+      ? question.config.min_value
+      : undefined;
+  const max =
+    kind === "number" && Number.isFinite(question.config.max_value)
+      ? question.config.max_value
+      : undefined;
+
   function submit(event: FormEvent) {
     event.preventDefault();
     const v = value.trim();
     if (!v) return;
+    if (kind === "number") {
+      const n = Number(v);
+      if (!Number.isFinite(n)) {
+        setError("Please enter a number.");
+        return;
+      }
+      if (min !== undefined && n < min) {
+        setError(`Please enter a number that's at least ${min}.`);
+        return;
+      }
+      if (max !== undefined && n > max) {
+        setError(`Please enter a number no greater than ${max}.`);
+        return;
+      }
+    }
+    setError("");
     onSubmit(v, v);
     setValue("");
   }
+
+  const range =
+    min !== undefined && max !== undefined
+      ? `${min}–${max}`
+      : min !== undefined
+        ? `min ${min}`
+        : max !== undefined
+          ? `max ${max}`
+          : "Enter a number";
+
   return (
-    <form onSubmit={submit} className="flex gap-2">
-      <input
-        className="input flex-1"
-        type={kind === "number" ? "number" : "email"}
-        inputMode={kind === "number" ? "decimal" : "email"}
-        placeholder={kind === "number" ? "Enter a number" : "you@example.com"}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        disabled={disabled}
-      />
-      <button className="btn-primary" disabled={disabled || !value.trim()}>
-        Submit
-      </button>
-    </form>
+    <div className="space-y-1.5">
+      <form onSubmit={submit} className="flex gap-2">
+        <input
+          className="input flex-1"
+          type={kind === "number" ? "number" : "email"}
+          inputMode={kind === "number" ? "decimal" : "email"}
+          min={min}
+          max={max}
+          placeholder={kind === "number" ? range : "you@example.com"}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            if (error) setError("");
+          }}
+          disabled={disabled}
+        />
+        <button className="btn-primary" disabled={disabled || !value.trim()}>
+          Submit
+        </button>
+      </form>
+      {error && <p className="text-xs text-coral-deep">{error}</p>}
+    </div>
   );
 }
 
