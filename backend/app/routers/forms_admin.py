@@ -5,6 +5,7 @@ from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
+from .. import llm
 from ..auth import require_admin
 from ..database import get_db
 from ..models import Form, Question, Session
@@ -18,7 +19,13 @@ from ..schemas import (
     QuestionOut,
     QuestionUpdate,
     ReorderRequest,
+    SuggestedQuestion,
+    SuggestQuestionsRequest,
+    SuggestQuestionsResponse,
 )
+
+# A single form tops out at this many questions.
+MAX_QUESTIONS = 30
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -110,6 +117,11 @@ def add_question(
     form_id: str, body: QuestionCreate, db: DbSession = Depends(get_db)
 ) -> Question:
     form = get_form_or_404(db, form_id)
+    if len(form.questions) >= MAX_QUESTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A conversation can have at most {MAX_QUESTIONS} questions.",
+        )
     _check_options(body.type, body.options)
     question = Question(
         form_id=form.id,
@@ -168,6 +180,36 @@ def reorder_questions(
         by_id[question_id].position = position
     db.commit()
     return sorted(form.questions, key=lambda q: q.position)
+
+
+# ---------- AI question suggestions ----------
+
+@router.post("/forms/{form_id}/suggest-questions", response_model=SuggestQuestionsResponse)
+def suggest_questions(
+    form_id: str, body: SuggestQuestionsRequest, db: DbSession = Depends(get_db)
+) -> SuggestQuestionsResponse:
+    """Draft questions about a topic. Nothing is persisted — the creator picks
+    which suggestions to keep, and those go through the normal create path."""
+    form = get_form_or_404(db, form_id)
+    remaining = MAX_QUESTIONS - len(form.questions)
+    if remaining <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This conversation already has the maximum of {MAX_QUESTIONS} questions.",
+        )
+
+    # Clamp the request to what the form can still hold.
+    effective = min(body.count, remaining)
+    try:
+        drafts = llm.suggest_questions(body.topic, effective)
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't generate suggestions right now — please try again.",
+        )
+
+    suggestions = [SuggestedQuestion(**draft) for draft in drafts]
+    return SuggestQuestionsResponse(count=effective, suggestions=suggestions)
 
 
 def _check_options(question_type: str, options: list) -> None:

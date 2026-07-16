@@ -57,6 +57,33 @@ class ReorderRequest(BaseModel):
     question_ids: list[str]
 
 
+# ---------- AI question suggestions ----------
+
+class SuggestQuestionsRequest(BaseModel):
+    """Creator asks the model for `count` questions about a free-text topic."""
+
+    topic: str = Field(min_length=1, max_length=200)
+    count: int = Field(ge=1, le=30)
+
+
+class SuggestedQuestion(BaseModel):
+    """One AI-suggested question — the creator cherry-picks which to keep.
+
+    The client groups these by `type`; there is no separate topical category.
+    """
+
+    text: str
+    type: QuestionType = "text"
+    options: list[str] = []
+    required: bool = True
+
+
+class SuggestQuestionsResponse(BaseModel):
+    # `count` is the effective number asked for (clamped to remaining capacity).
+    count: int
+    suggestions: list[SuggestedQuestion]
+
+
 # ---------- forms ----------
 
 class FormCreate(BaseModel):

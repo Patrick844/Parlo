@@ -8,6 +8,7 @@ import type {
   PublicForm,
   Question,
   QuestionType,
+  SuggestQuestionsResponse,
   Summary,
 } from "./types";
 
@@ -148,6 +149,13 @@ export const reorderQuestions = (formId: string, questionIds: string[]) =>
     body: { question_ids: questionIds },
     auth: true,
   });
+
+/** Ask the AI for a batch of questions about a topic (nothing is persisted). */
+export const suggestQuestions = (formId: string, topic: string, count: number) =>
+  request<SuggestQuestionsResponse>(
+    `/api/admin/forms/${formId}/suggest-questions`,
+    { method: "POST", body: { topic, count }, auth: true },
+  );
 
 // ---------- admin: insights ----------
 

@@ -83,3 +83,17 @@ export interface Summary {
   bullets: string[];
   sentiment: string;
 }
+
+/** One AI-suggested question the creator can cherry-pick into the form.
+ *  The builder groups these by `type` — there is no topical category. */
+export interface SuggestedQuestion {
+  text: string;
+  type: QuestionType;
+  options: string[];
+  required: boolean;
+}
+
+export interface SuggestQuestionsResponse {
+  count: number; // effective number requested (clamped to remaining slots)
+  suggestions: SuggestedQuestion[];
+}
