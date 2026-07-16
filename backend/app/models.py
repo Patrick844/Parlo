@@ -1,7 +1,8 @@
 """Database tables.
 
-The shape of the app in four tables:
-  Form      — a "conversation" a creator builds and shares.
+The shape of the app in five tables:
+  User      — a guest workspace, identified by email alone (no password).
+  Form      — a "conversation" a creator builds and shares (owned by a User).
   Question  — one item inside a form (ordered by `position`).
   Session   — one respondent's run through a form (their chat transcript).
   Answer    — one validated answer, linked to both a session and a question.
@@ -33,10 +34,30 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class User(Base):
+    """A guest workspace. Email is the identity — there is no password. This is
+    a public demo, so entering an email is identification, not authentication."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Always stored lowercased + trimmed (normalized in the auth router).
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    forms: Mapped[list["Form"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
+
+
 class Form(Base):
     __tablename__ = "forms"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # Which guest workspace owns this collection. Every admin route scopes to it.
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     slug: Mapped[str] = mapped_column(String(16), unique=True, index=True, default=new_slug)
@@ -45,6 +66,7 @@ class Form(Base):
     size: Mapped[int] = mapped_column(Integer, default=10)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    owner: Mapped["User"] = relationship(back_populates="forms")
     questions: Mapped[list["Question"]] = relationship(
         back_populates="form",
         order_by="Question.position",

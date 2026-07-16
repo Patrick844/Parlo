@@ -1,4 +1,10 @@
-"""Admin CRUD for forms and their questions. Every route requires the JWT."""
+"""Admin CRUD for forms and their questions.
+
+Every route is scoped to the signed-in guest (`require_user`): a user only ever
+sees or mutates forms whose `owner_id` matches their own id. Cross-user access
+is turned into a 404 (via `get_owned_form_or_404` / `get_owned_question_or_404`)
+so one workspace can't even probe for another's data.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import Integer, cast, func, select
@@ -6,9 +12,15 @@ from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
 from .. import llm
-from ..auth import require_admin
+from ..auth import require_user
 from ..database import get_db
-from ..models import Form, Question, Session
+from ..limits import (
+    MAX_AI_GENERATIONS_PER_DAY,
+    MAX_COLLECTIONS_PER_USER,
+    ai_generations_used,
+    record_ai_generation,
+)
+from ..models import Form, Question, Session, User
 from ..schemas import (
     FormCreate,
     FormListItem,
@@ -29,22 +41,41 @@ from ..schemas import (
 # (chosen at creation); this is only the hard upper bound the API will accept.
 MAX_QUESTIONS = 50
 
-router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def get_form_or_404(db: DbSession, form_id: str) -> Form:
+def get_owned_form_or_404(db: DbSession, form_id: str, user: User) -> Form:
+    """Load a form only if it belongs to `user`. A missing form and someone
+    else's form both return 404 — no way to tell them apart from outside."""
     form = db.get(Form, form_id, options=[selectinload(Form.questions)])
-    if form is None:
+    if form is None or form.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return form
+
+
+def get_owned_question_or_404(db: DbSession, question_id: str, user: User) -> Question:
+    """Load a question only if its parent form belongs to `user`."""
+    question = db.get(Question, question_id)
+    if question is None:
+        raise HTTPException(status_code=404, detail="Question not found")
+    form = db.get(Form, question.form_id)
+    if form is None or form.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return question
 
 
 # ---------- forms ----------
 
 @router.get("/forms", response_model=list[FormListItem])
-def list_forms(db: DbSession = Depends(get_db)) -> list[FormListItem]:
+def list_forms(
+    current_user: User = Depends(require_user), db: DbSession = Depends(get_db)
+) -> list[FormListItem]:
+    # Only this user's collections — never anyone else's.
     forms = db.scalars(
-        select(Form).options(selectinload(Form.questions)).order_by(Form.created_at.desc())
+        select(Form)
+        .where(Form.owner_id == current_user.id)
+        .options(selectinload(Form.questions))
+        .order_by(Form.created_at.desc())
     ).all()
 
     # One grouped query for session stats instead of one query per form.
@@ -55,7 +86,10 @@ def list_forms(db: DbSession = Depends(get_db)) -> list[FormListItem]:
                 Session.form_id,
                 func.count(Session.id).label("started"),
                 func.sum(cast(Session.completed, Integer)).label("finished"),
-            ).group_by(Session.form_id)
+            )
+            .join(Form, Session.form_id == Form.id)
+            .where(Form.owner_id == current_user.id)
+            .group_by(Session.form_id)
         )
     }
 
@@ -81,8 +115,27 @@ def list_forms(db: DbSession = Depends(get_db)) -> list[FormListItem]:
 
 
 @router.post("/forms", response_model=FormOut, status_code=201)
-def create_form(body: FormCreate, db: DbSession = Depends(get_db)) -> Form:
-    form = Form(title=body.title, description=body.description, size=body.size)
+def create_form(
+    body: FormCreate,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> Form:
+    # Demo guardrail: cap collections per workspace.
+    owned = db.scalar(select(func.count(Form.id)).where(Form.owner_id == current_user.id)) or 0
+    if owned >= MAX_COLLECTIONS_PER_USER:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Demo limit reached — up to {MAX_COLLECTIONS_PER_USER} collections "
+                "per account. Delete one to make room."
+            ),
+        )
+    form = Form(
+        owner_id=current_user.id,
+        title=body.title,
+        description=body.description,
+        size=body.size,
+    )
     db.add(form)
     db.commit()
     db.refresh(form)
@@ -90,13 +143,22 @@ def create_form(body: FormCreate, db: DbSession = Depends(get_db)) -> Form:
 
 
 @router.get("/forms/{form_id}", response_model=FormOut)
-def get_form(form_id: str, db: DbSession = Depends(get_db)) -> Form:
-    return get_form_or_404(db, form_id)
+def get_form(
+    form_id: str,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> Form:
+    return get_owned_form_or_404(db, form_id, current_user)
 
 
 @router.patch("/forms/{form_id}", response_model=FormOut)
-def update_form(form_id: str, body: FormUpdate, db: DbSession = Depends(get_db)) -> Form:
-    form = get_form_or_404(db, form_id)
+def update_form(
+    form_id: str,
+    body: FormUpdate,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> Form:
+    form = get_owned_form_or_404(db, form_id, current_user)
     # Only touch the fields the client actually sent.
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(form, field, value)
@@ -106,8 +168,12 @@ def update_form(form_id: str, body: FormUpdate, db: DbSession = Depends(get_db))
 
 
 @router.delete("/forms/{form_id}", response_model=OkResponse)
-def delete_form(form_id: str, db: DbSession = Depends(get_db)) -> OkResponse:
-    form = get_form_or_404(db, form_id)
+def delete_form(
+    form_id: str,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> OkResponse:
+    form = get_owned_form_or_404(db, form_id, current_user)
     db.delete(form)
     db.commit()
     return OkResponse()
@@ -117,9 +183,12 @@ def delete_form(form_id: str, db: DbSession = Depends(get_db)) -> OkResponse:
 
 @router.post("/forms/{form_id}/questions", response_model=QuestionOut, status_code=201)
 def add_question(
-    form_id: str, body: QuestionCreate, db: DbSession = Depends(get_db)
+    form_id: str,
+    body: QuestionCreate,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
 ) -> Question:
-    form = get_form_or_404(db, form_id)
+    form = get_owned_form_or_404(db, form_id, current_user)
     if len(form.questions) >= form.size:
         raise HTTPException(
             status_code=400,
@@ -147,11 +216,12 @@ def add_question(
 
 @router.patch("/questions/{question_id}", response_model=QuestionOut)
 def update_question(
-    question_id: str, body: QuestionUpdate, db: DbSession = Depends(get_db)
+    question_id: str,
+    body: QuestionUpdate,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
 ) -> Question:
-    question = db.get(Question, question_id)
-    if question is None:
-        raise HTTPException(status_code=404, detail="Question not found")
+    question = get_owned_question_or_404(db, question_id, current_user)
     changes = body.model_dump(exclude_unset=True)
     new_type = changes.get("type", question.type)
     new_options = changes.get("options", question.options)
@@ -169,10 +239,12 @@ def update_question(
 
 
 @router.delete("/questions/{question_id}", response_model=OkResponse)
-def delete_question(question_id: str, db: DbSession = Depends(get_db)) -> OkResponse:
-    question = db.get(Question, question_id)
-    if question is None:
-        raise HTTPException(status_code=404, detail="Question not found")
+def delete_question(
+    question_id: str,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> OkResponse:
+    question = get_owned_question_or_404(db, question_id, current_user)
     form_id = question.form_id
     db.delete(question)
     db.flush()
@@ -183,9 +255,12 @@ def delete_question(question_id: str, db: DbSession = Depends(get_db)) -> OkResp
 
 @router.put("/forms/{form_id}/questions/reorder", response_model=list[QuestionOut])
 def reorder_questions(
-    form_id: str, body: ReorderRequest, db: DbSession = Depends(get_db)
+    form_id: str,
+    body: ReorderRequest,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
 ) -> list[Question]:
-    form = get_form_or_404(db, form_id)
+    form = get_owned_form_or_404(db, form_id, current_user)
     by_id = {q.id: q for q in form.questions}
     if set(body.question_ids) != set(by_id):
         raise HTTPException(status_code=400, detail="Ids must match this conversation's questions")
@@ -199,16 +274,29 @@ def reorder_questions(
 
 @router.post("/forms/{form_id}/suggest-questions", response_model=SuggestQuestionsResponse)
 def suggest_questions(
-    form_id: str, body: SuggestQuestionsRequest, db: DbSession = Depends(get_db)
+    form_id: str,
+    body: SuggestQuestionsRequest,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
 ) -> SuggestQuestionsResponse:
     """Draft questions about a topic. Nothing is persisted — the creator picks
     which suggestions to keep, and those go through the normal create path."""
-    form = get_form_or_404(db, form_id)
+    form = get_owned_form_or_404(db, form_id, current_user)
     remaining = form.size - len(form.questions)
     if remaining <= 0:
         raise HTTPException(
             status_code=400,
             detail=f"This collection is set to {form.size} questions and is already full.",
+        )
+
+    # Demo guardrail: cap AI generations per user per day (protects the bill).
+    if ai_generations_used(current_user.id) >= MAX_AI_GENERATIONS_PER_DAY:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Demo limit reached — up to {MAX_AI_GENERATIONS_PER_DAY} AI generations "
+                "per day. Please try again tomorrow."
+            ),
         )
 
     # Clamp the request to what the form can still hold.
@@ -221,6 +309,9 @@ def suggest_questions(
             detail="Couldn't generate suggestions right now — please try again.",
         )
 
+    # Count the spend only after a successful call, so a failed OpenAI request
+    # doesn't burn the user's daily quota.
+    record_ai_generation(current_user.id)
     suggestions = [SuggestedQuestion(**draft) for draft in drafts]
     return SuggestQuestionsResponse(count=effective, suggestions=suggestions)
 

@@ -16,13 +16,25 @@ QuestionType = Literal[
 
 # ---------- auth ----------
 
-class LoginRequest(BaseModel):
-    password: str
+class EnterRequest(BaseModel):
+    """Email-only entry — no password. Normalized (lowercased/trimmed) server-side."""
+
+    email: str = Field(min_length=3, max_length=320)
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class MeResponse(BaseModel):
+    """Current guest + their demo usage, so the UI can show the limits."""
+
+    email: str
+    collections_used: int
+    collections_max: int
+    ai_used_today: int
+    ai_max_per_day: int
 
 
 # ---------- questions ----------

@@ -1,23 +1,28 @@
-/** Creator login: one password, one dark card. */
+/** Guest entry: one email field, no password. Enter an email → your workspace. */
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Logo from "../components/Logo";
-import { ApiError, login } from "../lib/api";
+import { ApiError, enter, getToken } from "../lib/api";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Already have a token? Skip straight to the dashboard.
+  useEffect(() => {
+    if (getToken()) navigate("/", { replace: true });
+  }, [navigate]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
     try {
-      await login(password);
+      await enter(email.trim());
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
@@ -32,28 +37,40 @@ export default function Login() {
         <div className="mb-1 text-center">
           <Logo size="text-4xl" />
         </div>
-        <p className="mb-8 text-center text-sm text-dim">
+        <p className="mb-6 text-center text-sm text-dim">
           👋 Ask anything. Just talk.
         </p>
 
+        {/* Friendly, light demo note. */}
+        <div className="mb-6 rounded-2xl border border-iris/20 bg-iris/5 px-4 py-3 text-xs text-dim">
+          <p className="font-medium text-iris">
+            🧪 This is a demo for testing — your data may be cleared from time to
+            time.
+          </p>
+          <p className="mt-1">Up to 15 collections and 25 AI generations per day.</p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="label" htmlFor="password">
-              Password
+            <label className="label" htmlFor="email">
+              Your email
             </label>
             <input
-              id="password"
-              type="password"
+              id="email"
+              type="email"
               className="input"
-              placeholder="Your creator password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               autoFocus
             />
+            <p className="mt-1.5 text-xs text-dim">
+              No password needed — your email is your workspace.
+            </p>
           </div>
           {error && <p className="text-sm text-coral-deep">{error}</p>}
-          <button className="btn-primary w-full" disabled={busy || !password}>
-            {busy ? "Signing in…" : "Sign in ✨"}
+          <button className="btn-primary w-full" disabled={busy || !email.trim()}>
+            {busy ? "Setting up…" : "Continue →"}
           </button>
         </form>
       </div>

@@ -76,13 +76,25 @@ async function request<T>(
 
 // ---------- auth ----------
 
-export async function login(password: string): Promise<void> {
-  const data = await request<{ access_token: string }>("/api/auth/login", {
+/** The current guest plus their demo usage (drives the header indicator). */
+export interface Me {
+  email: string;
+  collections_used: number;
+  collections_max: number;
+  ai_used_today: number;
+  ai_max_per_day: number;
+}
+
+/** Email-only entry: get-or-create a workspace and store its token. */
+export async function enter(email: string): Promise<void> {
+  const data = await request<{ access_token: string }>("/api/auth/enter", {
     method: "POST",
-    body: { password },
+    body: { email },
   });
   setToken(data.access_token);
 }
+
+export const getMe = () => request<Me>("/api/auth/me", { auth: true });
 
 // ---------- admin: forms ----------
 

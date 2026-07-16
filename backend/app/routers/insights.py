@@ -12,17 +12,18 @@ from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
 from .. import llm
-from ..auth import require_admin
+from ..auth import require_user
 from ..database import get_db
-from ..models import Answer, Form, Session
+from ..models import Answer, Form, Session, User
 from ..schemas import DayCount, InsightsOut, OptionAverage, QuestionInsight, SummaryOut
 
-router = APIRouter(prefix="/admin", tags=["insights"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/admin", tags=["insights"])
 
 
-def _load_form(db: DbSession, form_id: str) -> Form:
+def _load_form(db: DbSession, form_id: str, user: User) -> Form:
+    """Load a form only if it belongs to `user`; someone else's form 404s."""
     form = db.get(Form, form_id, options=[selectinload(Form.questions)])
-    if form is None:
+    if form is None or form.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return form
 
@@ -39,8 +40,12 @@ def _form_answers(db: DbSession, form_id: str) -> list[Answer]:
 
 
 @router.get("/forms/{form_id}/insights", response_model=InsightsOut)
-def insights(form_id: str, db: DbSession = Depends(get_db)) -> InsightsOut:
-    form = _load_form(db, form_id)
+def insights(
+    form_id: str,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> InsightsOut:
+    form = _load_form(db, form_id, current_user)
     sessions = db.scalars(select(Session).where(Session.form_id == form.id)).all()
     answers = _form_answers(db, form.id)
     answers_by_question: dict[str, list[Answer]] = {}
@@ -134,9 +139,13 @@ def _answers_by_day(answers: list[Answer]) -> list[DayCount]:
 
 
 @router.get("/forms/{form_id}/export.csv")
-def export_csv(form_id: str, db: DbSession = Depends(get_db)) -> StreamingResponse:
+def export_csv(
+    form_id: str,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> StreamingResponse:
     """One row per session, one column per question."""
-    form = _load_form(db, form_id)
+    form = _load_form(db, form_id, current_user)
     sessions = db.scalars(
         select(Session)
         .where(Session.form_id == form.id)
@@ -168,8 +177,12 @@ def export_csv(form_id: str, db: DbSession = Depends(get_db)) -> StreamingRespon
 
 
 @router.post("/forms/{form_id}/summarize", response_model=SummaryOut)
-def summarize(form_id: str, db: DbSession = Depends(get_db)) -> SummaryOut:
-    form = _load_form(db, form_id)
+def summarize(
+    form_id: str,
+    current_user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> SummaryOut:
+    form = _load_form(db, form_id, current_user)
     answers = _form_answers(db, form.id)
     if not answers:
         return SummaryOut(bullets=["No answers collected yet."], sentiment="neutral")
