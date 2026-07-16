@@ -129,20 +129,42 @@ def compose_intro(title: str, description: str, total: int) -> str:
 
 
 def phrase_question(
-    title: str, question: Question, position: int, total: int, is_first: bool
+    title: str,
+    question: Question,
+    position: int,
+    total: int,
+    is_first: bool,
+    prev_question: str | None = None,
+    prev_answer: str | None = None,
 ) -> str:
     """A short, warm way to ASK this specific question.
 
-    The widget renders the options/scale, so this stays brief. Non-first turns
-    may open with a tiny, varied acknowledgement. Falls back to the raw text.
+    On non-first turns we pass what the respondent just said so the model can
+    react to it naturally (like a real conversation) before asking the next
+    question — instead of a canned "Thanks!". Falls back to the raw text.
     """
     fallback = str(question.text)
-    ack = (
-        "Ask this question directly."
-        if is_first
-        else "You may open with a brief, varied acknowledgement (e.g. 'Got it.', "
-        "'Thanks!', 'Perfect.') then ask the question."
-    )
+    if is_first:
+        guidance = "Ask this question directly, warmly, in one sentence."
+    elif prev_answer:
+        guidance = (
+            "First, briefly and genuinely react to what they just said — vary it, "
+            "make it feel like a real conversation (a quick reaction, a light "
+            "comment, or a follow-on thought that fits their answer). Never just "
+            "say 'Thanks!' every time and never repeat the same opener. Then ask "
+            "the next question. Keep the whole thing to 1-2 short sentences."
+        )
+    else:
+        guidance = (
+            "Open with a brief, varied acknowledgement, then ask the question. "
+            "Keep it to one short sentence."
+        )
+    user_content = f"Next question ({position} of {total}): {question.text}\n({_answer_hint(question)})"
+    if prev_answer:
+        user_content = (
+            f"They were asked: {prev_question}\nThey answered: {prev_answer}\n\n"
+            + user_content
+        )
     try:
         response = get_client().chat.completions.create(
             model=settings.openai_model,
@@ -150,22 +172,15 @@ def phrase_question(
                 {
                     "role": "system",
                     "content": (
-                        "You are Parlo, a warm, concise conversational interviewer "
-                        f'collecting answers for "{title}". Rephrase the given question '
-                        "as ONE short, friendly sentence to ask the respondent now. "
-                        f"{ack} The answer widget already shows any options, so do not "
-                        "list them all — keep it brief. Plain text only, no quotes."
+                        "You are Parlo, a warm, genuinely conversational interviewer "
+                        f'collecting answers for "{title}". {guidance} The answer widget '
+                        "already shows any options/scale, so do not list them all. "
+                        "Plain text only, no quotes, no emoji spam."
                     ),
                 },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Question {position} of {total}: {question.text}\n"
-                        f"({_answer_hint(question)})"
-                    ),
-                },
+                {"role": "user", "content": user_content},
             ],
-            temperature=0.4,
+            temperature=0.7,
         )
         text = (response.choices[0].message.content or "").strip()
         return text or fallback

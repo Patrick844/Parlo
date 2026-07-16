@@ -191,9 +191,24 @@ def chat(slug: str, body: ChatRequest, db: DbSession = Depends(get_db)) -> ChatR
         return _finish_turn(db, session, history, CLOSING_MESSAGE, None, questions, answered)
 
     reply = llm.phrase_question(
-        form.title, nxt, _position_of(questions, nxt), total, is_first=False
+        form.title,
+        nxt,
+        _position_of(questions, nxt),
+        total,
+        is_first=False,
+        prev_question=current.text,
+        prev_answer=_render_answer(normalized),
     )
     return _finish_turn(db, session, history, reply, nxt, questions, answered)
+
+
+def _render_answer(value: object) -> str:
+    """Render a stored answer value as short readable text for the model."""
+    if isinstance(value, dict):
+        return ", ".join(f"{k}: {v}" for k, v in value.items())
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    return str(value)
 
 
 # --------------------------------------------------------------------------- #
