@@ -223,7 +223,7 @@ export default function FormEditor() {
               </button>
               <a
                 className="btn-ghost shrink-0"
-                href={publicLink(form.slug)}
+                href={`${publicLink(form.slug)}?preview=1`}
                 target="_blank"
                 rel="noreferrer"
               >

@@ -7,7 +7,7 @@
  */
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import confetti from "canvas-confetti";
 
 import Logo from "../components/Logo";
@@ -27,6 +27,8 @@ interface SeenQuestion {
 
 export default function Chat() {
   const { slug = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const isPreview = searchParams.get("preview") === "1";
   const [form, setForm] = useState<PublicForm | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -146,7 +148,7 @@ export default function Chat() {
 
   if (notFound) {
     return (
-      <CenteredShell>
+      <CenteredShell preview={isPreview}>
         <div className="card p-10 text-center">
           <p className="text-lg">This collection doesn't exist.</p>
           <p className="mt-1 text-sm text-dim">Double-check the link you were sent.</p>
@@ -157,7 +159,7 @@ export default function Chat() {
 
   if (!form) {
     return (
-      <CenteredShell>
+      <CenteredShell preview={isPreview}>
         <p className="text-center text-dim">Loading…</p>
       </CenteredShell>
     );
@@ -166,7 +168,7 @@ export default function Chat() {
   // ----- intro card, before the chat starts -----
   if (!started) {
     return (
-      <CenteredShell>
+      <CenteredShell preview={isPreview}>
         <div className="card p-8 text-center sm:p-10">
           <h1 className="text-2xl font-semibold">{form.title}</h1>
           {form.description && <p className="mt-3 text-dim">{form.description}</p>}
@@ -228,6 +230,7 @@ export default function Chat() {
 
       {/* Main — chat */}
       <main className="flex min-h-screen flex-1 flex-col px-4 py-4 sm:px-6">
+        {isPreview && <PreviewBanner />}
         {/* Mobile top bar */}
         <div className="mb-3 md:hidden">
           <div className="flex items-center justify-between">
@@ -317,15 +320,35 @@ export default function Chat() {
 }
 
 /** Centered single-column layout for the loading / intro / error states. */
-function CenteredShell({ children }: { children: React.ReactNode }) {
+function CenteredShell({
+  children,
+  preview,
+}: {
+  children: React.ReactNode;
+  preview?: boolean;
+}) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-4 py-6">
+      {preview && <PreviewBanner />}
       <div className="mb-6 text-center">
         <Logo size="text-lg" />
       </div>
       <div className="flex flex-1 items-center justify-center">
         <div className="w-full">{children}</div>
       </div>
+    </div>
+  );
+}
+
+/** Shown only when the creator opens their own collection via "Preview" — gives
+ *  a way back to the app (a real respondent never sees this). */
+function PreviewBanner() {
+  return (
+    <div className="mb-4 flex items-center justify-between rounded-xl border border-iris/30 bg-iris/10 px-4 py-2 text-xs">
+      <span className="text-iris">👀 Preview mode</span>
+      <Link to="/" className="font-medium text-iris hover:underline">
+        ← Back to your collections
+      </Link>
     </div>
   );
 }
