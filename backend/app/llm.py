@@ -153,16 +153,18 @@ def phrase_question(
         )
     elif prev_answer:
         guidance = (
-            "First, briefly and genuinely react to what they just said — vary it, "
-            "make it feel like a real conversation (a quick reaction, a light "
-            "comment, or a follow-on thought that fits their answer). Never just "
-            "say 'Thanks!' every time and never repeat the same opener. Then ask "
-            "the next question. Keep the whole thing to 1-2 short sentences."
+            "First, give a brief, natural reaction to what they just said — the way "
+            "a real person taking notes in a friendly chat would. Keep it LOW-KEY and "
+            "human: a small acknowledgement or a light on-topic remark. Do NOT gush or "
+            "flatter — no 'wow', 'amazing', 'incredible', 'that's wonderful', no "
+            "exclamation-point hype, and don't praise ordinary answers. Vary it and "
+            "never repeat the same opener. Then ask the next question. 1-2 short, "
+            "understated sentences."
         )
     else:
         guidance = (
-            "Open with a brief, varied acknowledgement, then ask the question. "
-            "Keep it to one short sentence."
+            "Open with a brief, natural, low-key acknowledgement (no gushing or hype), "
+            "then ask the question. One short sentence."
         )
     user_content = f"Next question ({position} of {total}): {question.text}\n({_answer_hint(question)})"
     if prev_answer:
@@ -177,8 +179,10 @@ def phrase_question(
                 {
                     "role": "system",
                     "content": (
-                        "You are Parlo, a warm, genuinely conversational interviewer "
-                        f'collecting answers for "{title}". {guidance} CRITICAL: you must '
+                        "You are Parlo, a warm but natural, down-to-earth interviewer "
+                        f'collecting answers for "{title}". You sound like a real person, '
+                        "never sycophantic, never over-enthusiastic or salesy. "
+                        f"{guidance} CRITICAL: you must "
                         "ask the EXACT question you are given — keep its full meaning, "
                         "never swap it for a different question, add new topics, or drift. "
                         "You may only make it sound natural. The answer widget already "

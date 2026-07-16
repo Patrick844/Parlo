@@ -258,6 +258,15 @@ export default function Chat() {
 
         {!done && (
           <div className="border-t border-edge pt-3">
+            {current && current.position > 1 && seen[current.position - 1] && (
+              <button
+                className="btn-ghost mb-3 text-xs"
+                onClick={() => handleEdit(seen[current.position - 1], current.position - 1)}
+                disabled={waiting}
+              >
+                ← Back to previous question
+              </button>
+            )}
             {current && (
               <div className="mb-3">
                 <AnswerWidget key={current.id} question={current} onSubmit={submitAnswer} disabled={waiting} />
