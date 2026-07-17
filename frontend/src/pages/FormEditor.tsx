@@ -783,7 +783,7 @@ function QuestionEditor({
                     />
                     <button
                       type="button"
-                      className="btn-danger px-2 py-1 text-xs"
+                      className="btn-danger h-11 w-11 inline-flex items-center justify-center p-0 text-xs"
                       onClick={() => removeOption(i)}
                       disabled={options.length <= 2}
                       aria-label="Remove option"
@@ -806,7 +806,7 @@ function QuestionEditor({
 
         <div className="flex shrink-0 flex-col gap-1">
           <button
-            className="btn-ghost px-2 py-1 text-xs"
+            className="btn-ghost h-11 w-11 inline-flex items-center justify-center p-0 text-xs"
             disabled={index === 0}
             onClick={() => onMove(index, -1)}
             aria-label="Move up"
@@ -814,7 +814,7 @@ function QuestionEditor({
             ↑
           </button>
           <button
-            className="btn-ghost px-2 py-1 text-xs"
+            className="btn-ghost h-11 w-11 inline-flex items-center justify-center p-0 text-xs"
             disabled={index === total - 1}
             onClick={() => onMove(index, 1)}
             aria-label="Move down"
@@ -822,7 +822,7 @@ function QuestionEditor({
             ↓
           </button>
           <button
-            className="btn-danger px-2 py-1 text-xs"
+            className="btn-danger h-11 w-11 inline-flex items-center justify-center p-0 text-xs"
             onClick={() => onDelete(question)}
             aria-label="Delete question"
           >

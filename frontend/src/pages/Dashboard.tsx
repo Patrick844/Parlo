@@ -56,7 +56,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">
             <span className="gradient-text">Collections</span> 🎈

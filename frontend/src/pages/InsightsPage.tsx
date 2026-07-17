@@ -242,7 +242,7 @@ function ChoiceBars({ counts }: { counts: Record<string, number> }) {
           type="category"
           dataKey="option"
           tick={axisStyle}
-          width={140}
+          width={90}
           axisLine={false}
           tickLine={false}
         />
@@ -297,7 +297,7 @@ function AllocationBars({ distribution }: { distribution: DistributionInsight[] 
           type="category"
           dataKey="option"
           tick={axisStyle}
-          width={140}
+          width={90}
           axisLine={false}
           tickLine={false}
         />

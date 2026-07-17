@@ -8,7 +8,7 @@
     @apply text-fog font-sans antialiased;
     background: linear-gradient(180deg, #fbf9ff 0%, #f5f0ff 100%);
     background-attachment: fixed;
-    min-height: 100vh;
+    min-height: 100svh;
   }
   ::selection {
     @apply bg-glow/25 text-fog;
@@ -21,7 +21,7 @@
     @apply rounded-3xl bg-card border border-edge shadow-soft;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px];
   }
   /* The star: gradient fill, white text, soft glow, bouncy press. */
   .btn-primary {
@@ -35,7 +35,7 @@
     @apply btn bg-white border border-edge text-dim shadow-soft hover:text-coral-deep hover:border-coral/50 active:scale-95;
   }
   .input {
-    @apply w-full rounded-xl bg-white border border-edge px-3 py-2 text-sm text-fog placeholder-dim/60 outline-none transition-shadow focus:border-glow/60 focus:ring-2 focus:ring-glow/30;
+    @apply w-full rounded-xl bg-white border border-edge px-3 py-2 text-base sm:text-sm text-fog placeholder-dim/60 outline-none transition-shadow focus:border-glow/60 focus:ring-2 focus:ring-glow/30;
   }
   .label {
     @apply block text-xs font-semibold uppercase tracking-wider text-dim mb-1.5;

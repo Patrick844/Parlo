@@ -227,7 +227,7 @@ export default function Chat() {
   );
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-5xl">
+    <div className="mx-auto flex h-[100svh] w-full max-w-5xl">
       {/* Sidebar — desktop */}
       <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col gap-6 border-r border-edge bg-surface/40 p-5 md:flex">
         <Logo size="text-lg" />
@@ -240,7 +240,7 @@ export default function Chat() {
       </aside>
 
       {/* Main — chat */}
-      <main className="flex min-h-screen flex-1 flex-col px-4 py-4 sm:px-6">
+      <main className="flex h-full min-h-0 flex-1 flex-col px-4 py-4 sm:px-6">
         {isPreview && <PreviewBanner />}
         {/* Mobile top bar */}
         <div className="mb-3 md:hidden">
@@ -261,7 +261,7 @@ export default function Chat() {
           )}
         </div>
 
-        <div className="nice-scroll flex-1 space-y-3 overflow-y-auto pb-4 pr-1">
+        <div className="nice-scroll flex-1 space-y-3 overflow-y-auto min-h-0 pb-4 pr-1">
           {messages.map((message, i) => (
             <Bubble key={i} message={message} />
           ))}
@@ -271,7 +271,7 @@ export default function Chat() {
         </div>
 
         {!done && (
-          <div className="border-t border-edge pt-3">
+          <div className="border-t border-edge pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {current && current.position > 1 && seen[current.position - 1] && (
               <button
                 className="btn-ghost mb-3 text-xs"
@@ -474,7 +474,7 @@ function Bubble({ message }: { message: Message }) {
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
           isUser
             ? "rounded-br-md border border-iris/25 bg-iris/15 text-fog"
             : "rounded-bl-md border border-edge bg-card"
@@ -546,7 +546,7 @@ function AnswerWidget({
 }
 
 const chip =
-  "rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50";
+  "rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 min-h-11";
 
 function SingleChoice({
   question,
