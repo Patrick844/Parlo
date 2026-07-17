@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Parlo API",
-    description="Conversational data collection — ask anything, just talk.",
+    description="Parlo — an AI feedback & analytics platform.",
     version="0.1.0",
     lifespan=lifespan,
 )

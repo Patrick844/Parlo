@@ -41,13 +41,12 @@ export default function Login() {
           👋 Collecting answers, one chat at a time.
         </p>
 
-        {/* Friendly, light demo note. */}
+        {/* Friendly fair-use note. */}
         <div className="mb-6 rounded-2xl border border-iris/20 bg-iris/5 px-4 py-3 text-xs text-dim">
           <p className="font-medium text-iris">
-            🧪 This is a demo for testing — your data may be cleared from time to
-            time.
+            ✨ Free to use — sign in with just your email, no password needed.
           </p>
-          <p className="mt-1">1 collection and up to 25 AI generations per day.</p>
+          <p className="mt-1">Fair-use limits: 1 collection and up to 25 AI generations per day.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
