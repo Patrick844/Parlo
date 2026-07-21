@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 import Logo from "../components/Logo";
 import { ApiError, enter, getToken } from "../lib/api";
+import { identify, track } from "../lib/analytics";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -22,7 +23,10 @@ export default function Login() {
     setBusy(true);
     setError("");
     try {
-      await enter(email.trim());
+      const clean = email.trim();
+      await enter(clean);
+      identify(clean);
+      track("signed_in");
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");

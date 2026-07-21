@@ -11,6 +11,7 @@ import {
   updateForm,
 } from "../lib/api";
 import type { FormListItem } from "../lib/types";
+import { track } from "../lib/analytics";
 
 const SIZE_PRESETS = [5, 10, 20];
 
@@ -30,6 +31,7 @@ export default function Dashboard() {
 
   async function handleCreate(title: string, size: number) {
     const form = await createForm(title, size);
+    track("form_created", { size });
     navigate(`/forms/${form.id}/edit`);
   }
 
@@ -50,6 +52,7 @@ export default function Dashboard() {
 
   async function handleCopy(item: FormListItem) {
     await navigator.clipboard.writeText(publicLink(item.slug));
+    track("form_link_copied");
     setCopiedId(item.id);
     setTimeout(() => setCopiedId(null), 1500);
   }

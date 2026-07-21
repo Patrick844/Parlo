@@ -12,6 +12,7 @@ import confetti from "canvas-confetti";
 
 import Logo from "../components/Logo";
 import { ApiError, getPublicForm, sendChat } from "../lib/api";
+import { track } from "../lib/analytics";
 import type { CurrentQuestion, ChatProgress, PublicForm } from "../lib/types";
 
 interface Message {
@@ -48,8 +49,14 @@ export default function Chat() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    getPublicForm(slug).then(setForm).catch(() => setNotFound(true));
-  }, [slug]);
+    getPublicForm(slug)
+      .then((f) => {
+        setForm(f);
+        // Respondent landed on a real share link (skip the creator's own preview).
+        if (!isPreview) track("respondent_opened", { slug, questions: f.question_count });
+      })
+      .catch(() => setNotFound(true));
+  }, [slug, isPreview]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -62,6 +69,7 @@ export default function Chat() {
   // Celebrate completion with a confetti burst in Parlo's gradient colors.
   useEffect(() => {
     if (!done) return;
+    if (!isPreview) track("respondent_completed", { slug });
     const colors = ["#7c3aed", "#d946ef", "#fb7185"];
     confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 }, colors });
     const t = setTimeout(
@@ -109,6 +117,7 @@ export default function Chat() {
   }
 
   function handleStart() {
+    if (!isPreview) track("respondent_started", { slug });
     void callChat({ message: null });
   }
 

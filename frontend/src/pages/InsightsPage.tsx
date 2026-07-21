@@ -23,6 +23,7 @@ import {
 
 import StatCard from "../components/StatCard";
 import { downloadCsv, getInsights, summarize } from "../lib/api";
+import { track } from "../lib/analytics";
 import type { DistributionInsight, Insights, QuestionInsight, Summary } from "../lib/types";
 
 // "Playful & Bright" palette — tuned for the light lilac surface.
@@ -52,7 +53,15 @@ export default function InsightsPage() {
   const [summarizing, setSummarizing] = useState(false);
 
   useEffect(() => {
-    getInsights(id).then(setData).catch(() => setError("Couldn't load insights"));
+    getInsights(id)
+      .then((d) => {
+        setData(d);
+        track("insights_viewed", {
+          started: d.sessions_started,
+          completed: d.sessions_completed,
+        });
+      })
+      .catch(() => setError("Couldn't load insights"));
   }, [id]);
 
   if (error) return <p className="text-coral-deep">{error}</p>;
@@ -73,6 +82,7 @@ export default function InsightsPage() {
     setSummarizing(true);
     try {
       setSummary(await summarize(id));
+      track("summary_generated");
     } catch {
       setSummary({ bullets: ["Couldn't generate a summary — try again."], sentiment: "" });
     } finally {
@@ -92,7 +102,10 @@ export default function InsightsPage() {
         <div className="flex items-center gap-2">
           <button
             className="btn-ghost text-xs"
-            onClick={() => downloadCsv(id, `parlo-${data.form_id}.csv`)}
+            onClick={() => {
+              track("csv_exported");
+              void downloadCsv(id, `parlo-${data.form_id}.csv`);
+            }}
           >
             Export CSV
           </button>
